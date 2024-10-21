@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Dynalist Chrome Extension</title>
+  <link rel="stylesheet" href="popup.css" type="text/css" />
+</head>
+
+<body>
+  <h3 id="title"></h3>
+  <input type="text" id="description"><br>
+
+  <button id="deleteButton" style="visibility: hidden; display: none;">Delete</button> <span id="status"></span>
+  <div id="fileSelection"></div>
+  <div id="nodeSelection"></div>
+  <input type="radio" id="newentry" name="savemode"><label for="newentry">Save as new entry</label><br>
+  <input type="radio" id="addtoentry" name="savemode"><label for="addtoentry">Save to description of an entry</label><br>
+</body>
+
+<script src="dynalist.js"></script>
+<script src="popup.js"></script>
+
+</html>
