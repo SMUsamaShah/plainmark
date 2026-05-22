@@ -6,7 +6,7 @@ const STORE_NAME  = 'handles';
 const HANDLE_KEY  = 'localMarkdown';
 const QUEUE_KEY   = 'localMarkdownQueue';
 
-// IndexedDB helpers — work in both service worker and extension page contexts
+// IndexedDB helpers — work in service worker and extension page contexts
 function openIDB() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open(IDB_NAME, IDB_VERSION);
@@ -19,7 +19,7 @@ function openIDB() {
 async function idbGet(key) {
     const db = await openIDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
+        const tx  = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).get(key);
         req.onsuccess = () => resolve(req.result);
         req.onerror   = () => reject(req.error);
@@ -40,12 +40,11 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
     get id()   { return 'local_markdown'; }
     get name() { return 'Local Markdown File'; }
 
-    // No text settings — file is picked via a button in options
     get settingsSchema() { return []; }
 
     async init(_settings = {}) {}
 
-    // Called from service worker: queue the entry (can't touch the file)
+    // Called from service worker: queue the entry (file I/O not available in SW)
     async add(title, url, note) {
         const id    = crypto.randomUUID();
         const entry = { id, title, url: url || '', note: note || '', timestamp: Date.now() };
@@ -58,20 +57,32 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { id };
     }
 
-    // Called from DOM context (popup or options) — flushes queue to file
+    // Check current permission without requesting — safe to call anywhere, no user gesture needed
+    async checkPermission() {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) return 'no-handle';
+        return handle.queryPermission({ mode: 'readwrite' });
+    }
+
+    // Request permission — MUST be called directly from a user gesture (button click)
+    async requestPermission() {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) return false;
+        const result = await handle.requestPermission({ mode: 'readwrite' });
+        return result === 'granted';
+    }
+
+    // Flush queued entries to file — only proceeds if permission already granted
+    // Returns { ok, message, needsPermission? }
     async flushQueue() {
         const handle = await idbGet(HANDLE_KEY);
         if (!handle) {
             return { ok: false, message: 'No file selected. Open Options to pick a Markdown file.' };
         }
 
-        // Check/request readwrite permission (requires prior user gesture)
-        let perm = await handle.queryPermission({ mode: 'readwrite' });
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
         if (perm !== 'granted') {
-            perm = await handle.requestPermission({ mode: 'readwrite' });
-        }
-        if (perm !== 'granted') {
-            return { ok: false, message: 'File permission denied.' };
+            return { ok: false, needsPermission: true, message: 'Tap "Grant file access" to write to your Markdown file.' };
         }
 
         const stored = await chrome.storage.local.get(QUEUE_KEY);
@@ -91,12 +102,14 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { ok: true, message: `Saved ${queue.length} bookmark(s) to file.`, count: queue.length };
     }
 
-    // Update the note line of an existing entry in the file
+    // Update note in file — must be called from DOM context (not service worker)
+    // Silently skips if no file or no permission (note update is non-critical)
     async update(id, note) {
         const handle = await idbGet(HANDLE_KEY);
-        if (!handle) return { ok: false, message: 'No file configured.' };
+        if (!handle) return { ok: true }; // no file configured, skip silently
 
-        await this._ensurePermission(handle);
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') return { ok: true }; // permission lapsed, skip silently
 
         const file    = await handle.getFile();
         const content = await file.text();
@@ -108,12 +121,13 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { ok: true };
     }
 
-    // Remove an entry from the file
+    // Remove entry from file — must be called from DOM context (not service worker)
     async delete(id) {
         const handle = await idbGet(HANDLE_KEY);
-        if (!handle) return { ok: false, message: 'No file configured.' };
+        if (!handle) return { ok: true };
 
-        await this._ensurePermission(handle);
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') return { ok: true };
 
         const file    = await handle.getFile();
         const content = await file.text();
@@ -125,7 +139,6 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { ok: true };
     }
 
-    // Called from options page after user picks a file
     async saveHandle(fileHandle) {
         await idbPut(HANDLE_KEY, fileHandle);
     }
@@ -138,7 +151,8 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
     async test() {
         const handle = await idbGet(HANDLE_KEY);
         if (!handle) return { ok: false, message: 'No file selected.' };
-        return { ok: true, message: `File: ${handle.name}` };
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        return { ok: true, message: `File: ${handle.name} (permission: ${perm})` };
     }
 
     _formatEntry({ id, title, url, note }) {
@@ -150,7 +164,6 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
     }
 
     _replaceNote(content, id, newNote) {
-        // Match the entry line and optional existing note line
         const entryPattern = new RegExp(
             `(- .*?<!-- bm:${id} -->)(\\n  > [^\\n]*)?`,
             'g'
@@ -166,13 +179,5 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
             'g'
         );
         return content.replace(entryPattern, '');
-    }
-
-    async _ensurePermission(handle) {
-        let perm = await handle.queryPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') {
-            perm = await handle.requestPermission({ mode: 'readwrite' });
-        }
-        if (perm !== 'granted') throw new Error('File permission denied.');
     }
 }

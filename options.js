@@ -129,13 +129,30 @@ pickFileBtn.addEventListener('click', async () => {
     }
 });
 
-// Flush queued bookmarks
+// Flush queued bookmarks — button click is a user gesture so requestPermission works here
 flushBtn.addEventListener('click', async () => {
     flushResultEl.textContent = 'Flushing...';
     flushResultEl.className   = '';
     try {
         const localEp = registry.getById('local_markdown');
         await localEp.init({});
+
+        // If permission not yet granted, request it now (button click = user gesture)
+        const perm = await localEp.checkPermission();
+        if (perm === 'no-handle') {
+            flushResultEl.textContent = 'No file selected. Pick a file first.';
+            flushResultEl.className   = 'error';
+            return;
+        }
+        if (perm !== 'granted') {
+            const granted = await localEp.requestPermission();
+            if (!granted) {
+                flushResultEl.textContent = 'File permission denied.';
+                flushResultEl.className   = 'error';
+                return;
+            }
+        }
+
         const result = await localEp.flushQueue();
         flushResultEl.textContent = result.message;
         flushResultEl.className   = result.ok ? '' : 'error';
