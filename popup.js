@@ -1,171 +1,105 @@
-const deleteButton = document.getElementById("deleteButton");
-const statusBox = document.getElementById("status");
-const descriptionBox = document.getElementById("description");
-const titleText = document.getElementById("title");
-const filesDropdown = document.getElementById("fileSelection");
-const nodesDropdown = document.getElementById("nodeSelection");
+import { registry } from './endpoints/registry.js';
 
-let savedNodeId;
-let timer;
+const noteBox       = document.getElementById('note');
+const titleEl       = document.getElementById('title');
+const statusEl      = document.getElementById('status');
+const deleteBtn     = document.getElementById('deleteBtn');
+const settingsBtn   = document.getElementById('settingsBtn');
+const endpointLabel = document.getElementById('endpoint-label');
 
-deleteButton.addEventListener('click', (e) => {
-    e.target.style.visibility="hidden";
-    e.target.style.display="none";
+// Read context passed via URL query params (from content_script)
+const params       = new URLSearchParams(location.search);
+const paramTitle   = params.get('title') || '';
+const paramUrl     = params.get('url')   || '';
+const paramNote    = params.get('note')  || '';
+const selectedText = params.get('selected') || '';
 
-    deleteRequest(e.target.value);
-    removePopup();
-});
-descriptionBox.focus();
+// Pre-fill note: selected page text takes priority over context menu note
+noteBox.value = selectedText || paramNote;
 
-descriptionBox.oninput = (e) => {
-    if(savedNodeId) {
-        let note = e.target.value;
-        showStatus("Updating...");
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            updateRequest(savedNodeId, note);
-        }, 400);
-    }
+let savedId  = null;
+let debTimer = null;
+
+function setStatus(text, cls = '') {
+    statusEl.textContent = text;
+    statusEl.className   = cls;
 }
 
-// when popup opens
-window.addEventListener('DOMContentLoaded', () => {
-    // create file selection dropdown
-    chrome.runtime.sendMessage({"message": "files"}, (response) => {
-        let fileDropDown = createDynalistFilesDropdown(response.files, response.selectionID);
-        // chrome.runtime.sendMessage({"message": "nodes", "fileID": fileDropDown.value}, (response) => {
-        //     createDynalistNodesDropdown(response.nodes, response.selectionID);
-        // });
-    });
-
-    // save tab
-    chrome.tabs.query({active: true, currentWindow: true}, tabs => {
-        titleText.textContent = tabs[0].title;
-        saveTab(tabs[0].title, tabs[0].url);
-    });
-});
-
-function createDynalistFilesDropdown(files, selectionID) {
-    // console.log(files);
-
-    let fileListSelect = document.createElement("select");
-    fileListSelect.onchange = (event) => {
-        let id = event.target.value;
-        fileListSelect.value = id;
-
-        chrome.storage.sync.set({'selectedFileID': id});
-    }
-
-    // populate the dropdown
-    for (file of files) {
-        let item;
-        if (file.type == "document") {
-            item = document.createElement("option");
-            item.text = file.title;
-            item.value = file.id;
-        } else if (file.type == "folder") {
-            item = document.createElement("optgroup");
-            item.label = file.title;
-            item.value = file.id;
-        }
-        fileListSelect.appendChild(item);
-    }
-    
-    chrome.storage.sync.get(['selectedFileID'], (result) => {
-        let id = result['selectedFileID'];
-        
-        if (id) 
-            fileListSelect.value = id;
-        else {
-            // fileListSelect.value = dl.fileID;
-        }
-    });
-    fileListSelect.value = selectionID;
-
-    filesDropdown.appendChild(fileListSelect);
-
-    return fileListSelect;
-}
-
-function createDynalistNodesDropdown(nodes, selectionID) {
-    let nodeSelectElement = document.createElement("select");
-    nodeSelectElement.onchange = (event) => {
-        let id = event.target.value;
-        nodeSelectElement.value = id;
-
-        chrome.storage.sync.set({'inboxNodeID': id});
-    }
-
-    for (node of nodes) {
-        let item;
-        item = document.createElement("option");
-        item.text = node.note;
-        item.value = node.id;
-        nodeSelectElement.appendChild(item);
-    }
-    
-    chrome.storage.sync.get(['inboxNodeID'], (result) => {
-        let id = result['inboxNodeID'];
-        
-        if (id) 
-            nodeSelectElement.value = id;
-        else {
-            // nodeSelectElement.value = dl.fileID;
-        }
-    });
-    nodeSelectElement.value = selectionID;
-
-    nodesDropdown.appendChild(nodeSelectElement);
-
-    return nodeSelectElement;
-}
-
-function showStatus(txt) {
-    statusBox.textContent = txt;
-}
-
-function saveTab(title, url, callback) {
-    showStatus("Saving...");
-    
-    chrome.runtime.sendMessage({"message": "add", "title": title, "url": url}, (response) => {
-        if (response.error) {
-            showStatus("Error saving");
-            return;
-        }
-        showStatus("Saved");
-        savedNodeId = response.newNodeID;
-        //show delete button
-        deleteButton.style.visibility = "visible";
-        deleteButton.style.display = "inline";
-        deleteButton.value = savedNodeId;
-    });
-}
-
-function deleteRequest(nodeID, callback) {
-    chrome.runtime.sendMessage({"message": "delete", "nodeID": nodeID}, (response) => {
-        if (response.error) {
-            showStatus("Error deleting");
-            return;
-        }
-        showStatus("Deleted");
-        removePopup();
-    });
-}
-
-function updateRequest(nodeID, description, callback) {
-    chrome.runtime.sendMessage({"message": "update", "nodeID": nodeID, "description": description}, (response) => {
-        if (response.error) {
-            showStatus("Error deleting");
-            return;
-        }
-        showStatus("Updated");
+function sendMsg(msg) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(msg, (res) => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            if (res?.error) return reject(new Error(res.error));
+            resolve(res);
+        });
     });
 }
 
 function removePopup() {
-    //chrome.runtime.sendMessage({"message": "hidepopup"});
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-        chrome.tabs.sendMessage(tabs[0].id, {"message": "removepopup"});  
-    });
+    // Post to parent window where content_script.js listens
+    window.parent.postMessage({ plainmark: 'close' }, '*');
 }
 
+// Settings gear opens options page
+settingsBtn.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+});
+
+// Note box: debounced update after initial save
+noteBox.addEventListener('input', () => {
+    if (!savedId) return;
+    setStatus('Updating...');
+    clearTimeout(debTimer);
+    debTimer = setTimeout(() => {
+        sendMsg({ message: 'update', id: savedId, note: noteBox.value })
+            .then(() => setStatus('Updated', 'saved'))
+            .catch(e => setStatus(e.message, 'error'));
+    }, 400);
+});
+
+// Delete button
+deleteBtn.addEventListener('click', () => {
+    if (!savedId) return;
+    setStatus('Deleting...');
+    sendMsg({ message: 'delete', id: savedId })
+        .then(() => { setStatus('Deleted'); setTimeout(removePopup, 600); })
+        .catch(e => setStatus(e.message, 'error'));
+});
+
+async function saveBookmark(title, url) {
+    setStatus('Saving...');
+    try {
+        const res = await sendMsg({ message: 'add', title, url, note: noteBox.value });
+        savedId = res.id;
+        setStatus('Saved', 'saved');
+        deleteBtn.style.display = 'inline-block';
+
+        // If local_markdown endpoint is active, flush the queue now (we're in DOM context)
+        const config = await sendMsg({ message: 'getConfig' });
+        if (config.endpointId === 'local_markdown') {
+            const ep = registry.getById('local_markdown');
+            await ep.init({});
+            const flush = await ep.flushQueue();
+            if (!flush.ok) setStatus(flush.message, 'error');
+        }
+    } catch (e) {
+        setStatus(e.message, 'error');
+    }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    // Show active endpoint name
+    try {
+        const config = await sendMsg({ message: 'getConfig' });
+        endpointLabel.textContent = config.endpointName || '';
+    } catch (_) {}
+
+    const title = paramTitle || '(unknown page)';
+    const url   = paramUrl   || '';
+
+    titleEl.textContent = title;
+    titleEl.title       = title;
+
+    await saveBookmark(title, url);
+    noteBox.focus();
+});

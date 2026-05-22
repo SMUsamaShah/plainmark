@@ -1,22 +1,15 @@
-function postRequestJson(url, requestBody, callback) {
-    fetch(url, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(requestBody)
-    })
-    .then(response => {
-        return response.json();
-    }, error => console.log(error))
-    .then(response => {
-        if (callback) callback(response);
-    }, error => console.log(error));
+export async function postJson(url, body, extraHeaders = {}) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    return response.json();
 }
 
-async function getURLTitle(url) {
-    let resp = await fetch(url, { method: "GET" });
-    let resultText = await resp.text();
-
-    let html =  new DOMParser().parseFromString(resultText, "text/html"); // document.createElement('html');
-    
-    return html.title;
+export async function getURLTitle(url) {
+    const resp = await fetch(url, { method: 'GET' });
+    const text = await resp.text();
+    return new DOMParser().parseFromString(text, 'text/html').title;
 }

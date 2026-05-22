@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Plainmark Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header>
+    <h1>Plainmark Settings</h1>
+  </header>
+
+  <main>
+    <section id="endpoint-section">
+      <h2>Active Endpoint</h2>
+      <div id="endpoint-radios"></div>
+    </section>
+
+    <section id="settings-section">
+      <h2 id="settings-heading">Settings</h2>
+      <form id="settings-form"></form>
+      <div id="file-picker-area" style="display:none">
+        <div id="current-file"></div>
+        <button type="button" id="pick-file-btn">Pick Markdown File</button>
+        <button type="button" id="flush-btn">Flush queued bookmarks to file</button>
+        <div id="flush-result"></div>
+      </div>
+    </section>
+
+    <section id="test-section">
+      <button type="button" id="test-btn">Test Connection</button>
+      <span id="test-result"></span>
+    </section>
+  </main>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>
