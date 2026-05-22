@@ -9,16 +9,16 @@ export class DynalistEndpoint extends BookmarkEndpoint {
 
     get settingsSchema() {
         return [
-            { key: 'token',       label: 'API Token',                          type: 'password', required: true,  placeholder: 'Get from dynalist.io/developer' },
-            { key: 'useInbox',    label: 'Send to Inbox (recommended)',         type: 'checkbox', required: false },
-            { key: 'fileId',      label: 'File ID (if not using inbox)',        type: 'text',     required: false, placeholder: 'File ID from Dynalist URL' },
-            { key: 'inboxNodeId', label: 'Parent Node ID (if not using inbox)', type: 'text',     required: false, placeholder: 'Node ID' },
+            { key: 'token',       label: 'API Token',    type: 'password', required: true,  placeholder: 'Get from dynalist.io/developer' },
+            { key: 'fileId',      label: 'File ID',      type: 'text',     required: true,  placeholder: 'FILE_ID — from your Dynalist doc URL or bookmarklet' },
+            { key: 'inboxNodeId', label: 'Parent Node ID', type: 'text',   required: true,  placeholder: 'INBOX_NODE_ID — the node new bookmarks go under' },
+            { key: 'useInbox',    label: 'Use /inbox/add instead (no File ID needed, but editing is disabled)', type: 'checkbox', required: false },
         ];
     }
 
     async init({ token, useInbox, fileId, inboxNodeId } = {}) {
         this._token       = token || '';
-        this._useInbox    = useInbox !== false; // default true
+        this._useInbox    = useInbox === true; // default false — requires explicit opt-in
         this._fileId      = fileId || '';
         this._inboxNodeId = inboxNodeId || '';
     }

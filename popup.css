@@ -83,6 +83,17 @@ body {
 }
 #deleteBtn:hover { background: #e74c3c; color: #fff; }
 
+#closeBtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #aaa;
+  background: none;
+  color: #666;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#closeBtn:hover { background: #f0f0f0; }
+
 #endpoint-label {
   font-size: 10px;
   color: #aaa;

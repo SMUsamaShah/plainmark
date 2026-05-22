@@ -4,6 +4,7 @@ const noteBox       = document.getElementById('note');
 const titleEl       = document.getElementById('title');
 const statusEl      = document.getElementById('status');
 const deleteBtn     = document.getElementById('deleteBtn');
+const closeBtn      = document.getElementById('closeBtn');
 const settingsBtn   = document.getElementById('settingsBtn');
 const endpointLabel = document.getElementById('endpoint-label');
 
@@ -56,6 +57,9 @@ noteBox.addEventListener('input', () => {
             .catch(e => setStatus(e.message, 'error'));
     }, 400);
 });
+
+// Close button
+closeBtn.addEventListener('click', removePopup);
 
 // Delete button
 deleteBtn.addEventListener('click', () => {
