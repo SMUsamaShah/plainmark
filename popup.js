@@ -81,55 +81,15 @@ deleteBtn.addEventListener('click', async () => {
     }
 });
 
-// Show a prominent grant-access bar when file permission has lapsed.
-// preloadedHandle is already in memory so requestPermission() is the first
-// await in the click handler — no IDB lookup in the hot path.
-function showGrantBar(fileName) {
-    if (document.getElementById('grantBar')) return;
-
-    const bar = document.createElement('div');
-    bar.id = 'grantBar';
-    bar.style.cssText = [
-        'background:#fff3e0', 'border:1px solid #e67e22', 'border-radius:5px',
-        'padding:6px 10px', 'font-size:11px', 'color:#a04000',
-        'display:flex', 'align-items:center', 'gap:8px', 'margin-bottom:4px',
-    ].join(';');
-
-    const msg = document.createElement('span');
-    msg.style.flex    = '1';
-    msg.textContent   = `Grant access to write to ${fileName || 'your file'}`;
-
-    const btn = document.createElement('button');
-    btn.textContent   = 'Grant';
-    btn.style.cssText = 'font-size:11px;padding:2px 10px;border:1px solid #e67e22;background:#e67e22;color:#fff;border-radius:3px;cursor:pointer;';
-
-    btn.addEventListener('click', async () => {
-        if (!preloadedHandle) return;
-        // requestPermission() is the first await — user activation is still valid
-        const perm = await preloadedHandle.requestPermission({ mode: 'readwrite' });
-        if (perm === 'granted') {
-            bar.remove();
-            const ep     = registry.getById('local_markdown');
-            const result = await ep.flushQueue();
-            setStatus(result.ok ? `Saved to ${preloadedHandle.name}` : result.message,
-                      result.ok ? 'saved' : 'error');
-        } else {
-            msg.textContent = 'Permission denied. Open ⚙ Options to try again.';
-            btn.remove();
-        }
-    });
-
-    bar.append(msg, btn);
-    // Insert above the footer row
-    document.getElementById('footer').before(bar);
-}
+// requestPermission() requires a top-level browsing context and cannot be called
+// from an iframe — direct the user to the options page (a real tab) instead.
 
 async function handleLocalMarkdownFlush(ep) {
     const result = await ep.flushQueue();
     if (result.needsPermission) {
-        const name = preloadedHandle?.name ?? '';
-        showGrantBar(name);
-        setStatus('Queued', '');
+        // Can't request permission from an iframe — send user to options page
+        const name = preloadedHandle?.name ?? 'your file';
+        setStatus(`Queued. Open ⚙ Options → Grant access to ${name}`, '');
     } else if (result.ok && result.count > 0) {
         setStatus(`Saved to ${preloadedHandle?.name ?? 'file'}`, 'saved');
     } else if (!result.ok) {
@@ -160,10 +120,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         endpointLabel.textContent = config.endpointName || '';
     } catch (_) {}
 
-    // Pre-load file handle so grant button click has no IDB latency
+    // Pre-load filename for use in status messages
     if (activeEndpointId === 'local_markdown') {
-        const ep = registry.getById('local_markdown');
-        preloadedHandle = await ep.getHandle();
+        preloadedHandle = await registry.getById('local_markdown').getHandle();
     }
 
     const title = paramTitle || '(unknown page)';
