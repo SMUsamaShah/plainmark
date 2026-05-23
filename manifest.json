@@ -15,7 +15,8 @@
   "permissions": [
     "tabs",
     "contextMenus",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "host_permissions": [
     "http://*/*",
@@ -47,7 +48,9 @@
       "endpoints/registry.js",
       "endpoints/dynalist.js",
       "endpoints/workflowy.js",
-      "endpoints/local_markdown.js"
+      "endpoints/local_markdown.js",
+      "endpoints/downloads_file.js",
+      "endpoints/browser_storage.js"
     ],
     "matches": ["http://*/*", "https://*/*"]
   }]

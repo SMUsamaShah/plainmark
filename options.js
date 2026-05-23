@@ -1,19 +1,26 @@
 import { registry } from './endpoints/registry.js';
 
-const endpointRadiosEl = document.getElementById('endpoint-radios');
-const settingsFormEl   = document.getElementById('settings-form');
-const settingsHeading  = document.getElementById('settings-heading');
-const filePickerArea   = document.getElementById('file-picker-area');
-const currentFileEl    = document.getElementById('current-file');
-const pickFileBtn      = document.getElementById('pick-file-btn');
-const grantStep        = document.getElementById('grant-step');
-const permStatusEl     = document.getElementById('permission-status');
-const grantAccessBtn   = document.getElementById('grant-access-btn');
-const queueStep        = document.getElementById('queue-step');
-const queueStatusEl    = document.getElementById('queue-status');
-const flushBtn         = document.getElementById('flush-btn');
-const testBtn          = document.getElementById('test-btn');
-const testResultEl     = document.getElementById('test-result');
+const endpointRadiosEl  = document.getElementById('endpoint-radios');
+const settingsFormEl    = document.getElementById('settings-form');
+const settingsHeading   = document.getElementById('settings-heading');
+const filePickerArea    = document.getElementById('file-picker-area');
+const currentFileEl     = document.getElementById('current-file');
+const pickFileBtn       = document.getElementById('pick-file-btn');
+const grantStep         = document.getElementById('grant-step');
+const permStatusEl      = document.getElementById('permission-status');
+const grantAccessBtn    = document.getElementById('grant-access-btn');
+const queueStep         = document.getElementById('queue-step');
+const queueStatusEl     = document.getElementById('queue-status');
+const flushBtn          = document.getElementById('flush-btn');
+const testBtn           = document.getElementById('test-btn');
+const testResultEl      = document.getElementById('test-result');
+const browserStorageArea = document.getElementById('browser-storage-area');
+const bsCountEl          = document.getElementById('bs-count');
+const bsCopyMdBtn        = document.getElementById('bs-copy-md-btn');
+const bsCopyJsonBtn      = document.getElementById('bs-copy-json-btn');
+const bsDownloadBtn      = document.getElementById('bs-download-btn');
+const bsClearBtn         = document.getElementById('bs-clear-btn');
+const bsExportResult     = document.getElementById('bs-export-result');
 
 // Pre-loaded handle — populated when local_markdown settings are rendered.
 // Storing it here means button click handlers can call handle.requestPermission()
@@ -63,11 +70,12 @@ async function renderSettingsForm(endpointId) {
     const ep       = registry.getById(endpointId);
     const settings = await registry.getSettings(endpointId);
 
-    settingsHeading.textContent  = `${ep.name} Settings`;
-    settingsFormEl.innerHTML     = '';
-    filePickerArea.style.display = 'none';
-    testResultEl.textContent     = '';
-    testResultEl.className       = '';
+    settingsHeading.textContent       = `${ep.name} Settings`;
+    settingsFormEl.innerHTML          = '';
+    filePickerArea.style.display      = 'none';
+    browserStorageArea.style.display  = 'none';
+    testResultEl.textContent          = '';
+    testResultEl.className            = '';
 
     for (const field of ep.settingsSchema) {
         const wrapper = document.createElement('div');
@@ -108,6 +116,11 @@ async function renderSettingsForm(endpointId) {
     if (endpointId === 'local_markdown') {
         filePickerArea.style.display = 'block';
         await refreshLocalMarkdownUI();
+    }
+
+    if (endpointId === 'browser_storage') {
+        browserStorageArea.style.display = 'block';
+        await refreshBrowserStorageUI();
     }
 }
 
@@ -202,6 +215,52 @@ flushBtn.addEventListener('click', async () => {
         queueStatusEl.textContent = e.message;
     }
     flushBtn.disabled = false;
+});
+
+// Browser Storage UI
+async function refreshBrowserStorageUI() {
+    const ep   = registry.getById('browser_storage');
+    const list = await ep.getAll();
+    bsCountEl.textContent = `${list.length} bookmark${list.length === 1 ? '' : 's'} saved.`;
+    bsExportResult.textContent = '';
+}
+
+function showExportResult(msg) {
+    bsExportResult.textContent = msg;
+    setTimeout(() => { bsExportResult.textContent = ''; }, 2000);
+}
+
+bsCopyMdBtn.addEventListener('click', async () => {
+    const ep   = registry.getById('browser_storage');
+    const list = await ep.getAll();
+    await navigator.clipboard.writeText(ep.toMarkdown(list));
+    showExportResult('Copied!');
+});
+
+bsCopyJsonBtn.addEventListener('click', async () => {
+    const ep   = registry.getById('browser_storage');
+    const list = await ep.getAll();
+    await navigator.clipboard.writeText(JSON.stringify(list, null, 2));
+    showExportResult('Copied!');
+});
+
+bsDownloadBtn.addEventListener('click', async () => {
+    const ep      = registry.getById('browser_storage');
+    const list    = await ep.getAll();
+    const content = ep.toMarkdown(list);
+    const url     = 'data:text/markdown;charset=utf-8,' + encodeURIComponent(content);
+    const a       = document.createElement('a');
+    a.href     = url;
+    a.download = 'plainmark-bookmarks.md';
+    a.click();
+    showExportResult('Downloaded!');
+});
+
+bsClearBtn.addEventListener('click', async () => {
+    if (!confirm('Delete all bookmarks from browser storage? This cannot be undone.')) return;
+    const ep = registry.getById('browser_storage');
+    await ep.clear();
+    await refreshBrowserStorageUI();
 });
 
 // Test connection

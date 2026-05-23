@@ -151,6 +151,14 @@ button:hover { background: #357abd; border-color: #357abd; }
 
 #queue-status { font-size: 12px; color: #555; }
 
+/* Danger button */
+.btn-danger {
+  background: #fff;
+  color: #c0392b;
+  border-color: #c0392b;
+}
+.btn-danger:hover { background: #fdf2f2; }
+
 /* Test section */
 #test-section { display: flex; align-items: center; gap: 12px; }
 

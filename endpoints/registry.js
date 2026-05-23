@@ -1,11 +1,15 @@
-import { DynalistEndpoint }      from './dynalist.js';
-import { WorkflowyEndpoint }     from './workflowy.js';
-import { LocalMarkdownEndpoint } from './local_markdown.js';
+import { DynalistEndpoint }       from './dynalist.js';
+import { WorkflowyEndpoint }      from './workflowy.js';
+import { LocalMarkdownEndpoint }  from './local_markdown.js';
+import { DownloadsFileEndpoint }  from './downloads_file.js';
+import { BrowserStorageEndpoint } from './browser_storage.js';
 
 const ALL_ENDPOINTS = [
     new DynalistEndpoint(),
     new WorkflowyEndpoint(),
     new LocalMarkdownEndpoint(),
+    new DownloadsFileEndpoint(),
+    new BrowserStorageEndpoint(),
 ];
 
 export const registry = {

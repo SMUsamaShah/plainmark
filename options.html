@@ -20,6 +20,27 @@
       <h2 id="settings-heading">Settings</h2>
       <form id="settings-form"></form>
 
+      <!-- Browser Storage only: shown in place of the form -->
+      <div id="browser-storage-area" style="display:none">
+        <div class="step">
+          <span class="step-label">Stored bookmarks</span>
+          <div id="bs-count"></div>
+        </div>
+        <div class="step">
+          <span class="step-label">Export</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" id="bs-copy-md-btn">Copy as Markdown</button>
+            <button type="button" id="bs-copy-json-btn">Copy as JSON</button>
+            <button type="button" id="bs-download-btn">Download .md</button>
+          </div>
+          <div id="bs-export-result" style="font-size:12px;color:#27ae60;margin-top:4px"></div>
+        </div>
+        <div class="step">
+          <span class="step-label">Danger zone</span>
+          <button type="button" id="bs-clear-btn" class="btn-danger">Clear all bookmarks</button>
+        </div>
+      </div>
+
       <!-- Local Markdown only: shown in place of the form -->
       <div id="file-picker-area" style="display:none">
 
