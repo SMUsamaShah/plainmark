@@ -9,19 +9,20 @@ const settingsBtn   = document.getElementById('settingsBtn');
 const endpointLabel = document.getElementById('endpoint-label');
 const actionsEl     = document.getElementById('actions');
 
-// Read context passed via URL query params (from content_script)
 const params       = new URLSearchParams(location.search);
 const paramTitle   = params.get('title') || '';
 const paramUrl     = params.get('url')   || '';
 const paramNote    = params.get('note')  || '';
 const selectedText = params.get('selected') || '';
 
-// Pre-fill note: selected page text takes priority over context menu note
 noteBox.value = selectedText || paramNote;
 
 let savedId          = null;
 let debTimer         = null;
 let activeEndpointId = null;
+// Pre-loaded file handle for local_markdown — avoids IDB round-trip in click handlers,
+// which would consume the user-activation required by requestPermission()
+let preloadedHandle  = null;
 
 function setStatus(text, cls = '') {
     statusEl.textContent = text;
@@ -42,26 +43,18 @@ function removePopup() {
     window.parent.postMessage({ plainmark: 'close' }, '*');
 }
 
-// Settings gear opens options page
-settingsBtn.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-});
-
-// Close button
+settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 closeBtn.addEventListener('click', removePopup);
 
-// Note box: debounced update after initial save
-// For local_markdown: runs directly in popup (service worker can't use File System API)
-// For other endpoints: routes through service worker
+// Note updates — local_markdown runs directly in popup (service worker can't use File System API)
 noteBox.addEventListener('input', () => {
     if (!savedId) return;
-    setStatus('Updating...');
+    setStatus('Updating…');
     clearTimeout(debTimer);
     debTimer = setTimeout(async () => {
         try {
             if (activeEndpointId === 'local_markdown') {
-                const ep = registry.getById('local_markdown');
-                await ep.update(savedId, noteBox.value);
+                await registry.getById('local_markdown').update(savedId, noteBox.value);
             } else {
                 await sendMsg({ message: 'update', id: savedId, note: noteBox.value });
             }
@@ -72,14 +65,12 @@ noteBox.addEventListener('input', () => {
     }, 400);
 });
 
-// Delete button — same split: local_markdown handled directly, others via service worker
 deleteBtn.addEventListener('click', async () => {
     if (!savedId) return;
-    setStatus('Deleting...');
+    setStatus('Deleting…');
     try {
         if (activeEndpointId === 'local_markdown') {
-            const ep = registry.getById('local_markdown');
-            await ep.delete(savedId);
+            await registry.getById('local_markdown').delete(savedId);
         } else {
             await sendMsg({ message: 'delete', id: savedId });
         }
@@ -90,41 +81,64 @@ deleteBtn.addEventListener('click', async () => {
     }
 });
 
-// Show a "Grant file access" button — clicking it IS a user gesture so requestPermission works
-function showGrantButton(ep) {
-    if (document.getElementById('grantBtn')) return; // already shown
-    setStatus('File access needed');
+// Show a prominent grant-access bar when file permission has lapsed.
+// preloadedHandle is already in memory so requestPermission() is the first
+// await in the click handler — no IDB lookup in the hot path.
+function showGrantBar(fileName) {
+    if (document.getElementById('grantBar')) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'grantBar';
+    bar.style.cssText = [
+        'background:#fff3e0', 'border:1px solid #e67e22', 'border-radius:5px',
+        'padding:6px 10px', 'font-size:11px', 'color:#a04000',
+        'display:flex', 'align-items:center', 'gap:8px', 'margin-bottom:4px',
+    ].join(';');
+
+    const msg = document.createElement('span');
+    msg.style.flex    = '1';
+    msg.textContent   = `Grant access to write to ${fileName || 'your file'}`;
+
     const btn = document.createElement('button');
-    btn.id          = 'grantBtn';
-    btn.textContent = 'Grant file access';
-    btn.style.cssText = 'font-size:11px;padding:2px 8px;border:1px solid #4a90e2;background:none;color:#4a90e2;border-radius:3px;cursor:pointer;margin-right:4px;';
+    btn.textContent   = 'Grant';
+    btn.style.cssText = 'font-size:11px;padding:2px 10px;border:1px solid #e67e22;background:#e67e22;color:#fff;border-radius:3px;cursor:pointer;';
+
     btn.addEventListener('click', async () => {
-        btn.remove();
-        const granted = await ep.requestPermission(); // user gesture satisfies the requirement
-        if (granted) {
+        if (!preloadedHandle) return;
+        // requestPermission() is the first await — user activation is still valid
+        const perm = await preloadedHandle.requestPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+            bar.remove();
+            const ep     = registry.getById('local_markdown');
             const result = await ep.flushQueue();
-            setStatus(result.ok ? result.message : result.message, result.ok ? 'saved' : 'error');
+            setStatus(result.ok ? `Saved to ${preloadedHandle.name}` : result.message,
+                      result.ok ? 'saved' : 'error');
         } else {
-            setStatus('Permission denied', 'error');
+            msg.textContent = 'Permission denied. Open ⚙ Options to try again.';
+            btn.remove();
         }
     });
-    actionsEl.prepend(btn);
+
+    bar.append(msg, btn);
+    // Insert above the footer row
+    document.getElementById('footer').before(bar);
 }
 
-async function handleLocalMarkdownFlush() {
-    const ep = registry.getById('local_markdown');
+async function handleLocalMarkdownFlush(ep) {
     const result = await ep.flushQueue();
     if (result.needsPermission) {
-        showGrantButton(ep);
+        const name = preloadedHandle?.name ?? '';
+        showGrantBar(name);
+        setStatus('Queued', '');
     } else if (result.ok && result.count > 0) {
-        setStatus(result.message, 'saved');
+        setStatus(`Saved to ${preloadedHandle?.name ?? 'file'}`, 'saved');
     } else if (!result.ok) {
         setStatus(result.message, 'error');
     }
 }
 
 async function saveBookmark(title, url) {
-    setStatus('Saving...');
+    setStatus('Saving…');
     try {
         const res = await sendMsg({ message: 'add', title, url, note: noteBox.value });
         savedId = res.id;
@@ -132,7 +146,7 @@ async function saveBookmark(title, url) {
         deleteBtn.style.display = 'inline-block';
 
         if (activeEndpointId === 'local_markdown') {
-            await handleLocalMarkdownFlush();
+            await handleLocalMarkdownFlush(registry.getById('local_markdown'));
         }
     } catch (e) {
         setStatus(e.message, 'error');
@@ -146,9 +160,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         endpointLabel.textContent = config.endpointName || '';
     } catch (_) {}
 
+    // Pre-load file handle so grant button click has no IDB latency
+    if (activeEndpointId === 'local_markdown') {
+        const ep = registry.getById('local_markdown');
+        preloadedHandle = await ep.getHandle();
+    }
+
     const title = paramTitle || '(unknown page)';
     const url   = paramUrl   || '';
-
     titleEl.textContent = title;
     titleEl.title       = title;
 

@@ -6,12 +6,19 @@ const settingsHeading  = document.getElementById('settings-heading');
 const filePickerArea   = document.getElementById('file-picker-area');
 const currentFileEl    = document.getElementById('current-file');
 const pickFileBtn      = document.getElementById('pick-file-btn');
+const grantStep        = document.getElementById('grant-step');
+const permStatusEl     = document.getElementById('permission-status');
+const grantAccessBtn   = document.getElementById('grant-access-btn');
+const queueStep        = document.getElementById('queue-step');
+const queueStatusEl    = document.getElementById('queue-status');
 const flushBtn         = document.getElementById('flush-btn');
-const flushResultEl    = document.getElementById('flush-result');
 const testBtn          = document.getElementById('test-btn');
 const testResultEl     = document.getElementById('test-result');
 
-let activeEndpointId = null;
+// Pre-loaded handle — populated when local_markdown settings are rendered.
+// Storing it here means button click handlers can call handle.requestPermission()
+// as their very first await, satisfying the user-activation requirement.
+let preloadedHandle = null;
 
 function debounce(fn, ms) {
     let t;
@@ -19,29 +26,28 @@ function debounce(fn, ms) {
 }
 
 async function init() {
-    activeEndpointId = await registry.getActiveId();
-    renderEndpointRadios();
-    renderSettingsForm(activeEndpointId);
+    const activeId = await registry.getActiveId();
+    renderEndpointRadios(activeId);
+    await renderSettingsForm(activeId);
 }
 
-function renderEndpointRadios() {
+function renderEndpointRadios(activeId) {
     endpointRadiosEl.innerHTML = '';
     for (const ep of registry.getAll()) {
         const label = document.createElement('label');
-        label.className = 'endpoint-radio' + (ep.id === activeEndpointId ? ' active' : '');
+        label.className = 'endpoint-radio' + (ep.id === activeId ? ' active' : '');
 
         const radio = document.createElement('input');
         radio.type    = 'radio';
         radio.name    = 'endpoint';
         radio.value   = ep.id;
-        radio.checked = ep.id === activeEndpointId;
+        radio.checked = ep.id === activeId;
 
         radio.addEventListener('change', async () => {
-            activeEndpointId = ep.id;
             await registry.setActiveId(ep.id);
             document.querySelectorAll('.endpoint-radio').forEach(el => el.classList.remove('active'));
             label.classList.add('active');
-            renderSettingsForm(ep.id);
+            await renderSettingsForm(ep.id);
         });
 
         const nameSpan = document.createElement('span');
@@ -57,8 +63,8 @@ async function renderSettingsForm(endpointId) {
     const ep       = registry.getById(endpointId);
     const settings = await registry.getSettings(endpointId);
 
-    settingsHeading.textContent = `${ep.name} Settings`;
-    settingsFormEl.innerHTML    = '';
+    settingsHeading.textContent  = `${ep.name} Settings`;
+    settingsFormEl.innerHTML     = '';
     filePickerArea.style.display = 'none';
     testResultEl.textContent     = '';
     testResultEl.className       = '';
@@ -68,9 +74,9 @@ async function renderSettingsForm(endpointId) {
         wrapper.className = field.type === 'checkbox' ? 'field checkbox-field' : 'field';
 
         const input = document.createElement('input');
-        input.type  = field.type;
-        input.id    = `field-${field.key}`;
-        input.name  = field.key;
+        input.type = field.type;
+        input.id   = `field-${field.key}`;
+        input.name = field.key;
 
         if (field.type === 'checkbox') {
             input.checked = settings[field.key] !== false;
@@ -83,7 +89,6 @@ async function renderSettingsForm(endpointId) {
         lbl.htmlFor     = input.id;
         lbl.textContent = field.label;
 
-        // Auto-save on change
         const save = debounce(async () => {
             const current = await registry.getSettings(endpointId);
             current[field.key] = field.type === 'checkbox' ? input.checked : input.value;
@@ -100,28 +105,67 @@ async function renderSettingsForm(endpointId) {
         settingsFormEl.appendChild(wrapper);
     }
 
-    // Local markdown: show file picker UI
     if (endpointId === 'local_markdown') {
-        filePickerArea.style.display = 'flex';
-        const localEp = registry.getById('local_markdown');
-        await localEp.init({});
-        const fileName = await localEp.getFileName();
-        currentFileEl.textContent = fileName
-            ? `Current file: ${fileName}`
-            : 'No file selected.';
+        filePickerArea.style.display = 'block';
+        await refreshLocalMarkdownUI();
     }
 }
 
-// Pick a markdown file (local_markdown endpoint only)
+// Refresh the entire local_markdown UI: file name, permission status, queue count
+async function refreshLocalMarkdownUI() {
+    const ep = registry.getById('local_markdown');
+
+    // Pre-load handle (safe to do without user gesture)
+    preloadedHandle = await ep.getHandle();
+
+    if (!preloadedHandle) {
+        currentFileEl.textContent  = 'No file chosen.';
+        grantStep.style.display    = 'none';
+        queueStep.style.display    = 'none';
+        return;
+    }
+
+    // Step 1: show filename
+    currentFileEl.textContent = `✓ ${preloadedHandle.name}`;
+
+    // Step 2: permission
+    grantStep.style.display = 'block';
+    const perm = await preloadedHandle.queryPermission({ mode: 'readwrite' });
+    updatePermissionUI(perm);
+
+    // Step 3: queue
+    const stored = await chrome.storage.local.get('localMarkdownQueue');
+    const queue  = stored['localMarkdownQueue'] ?? [];
+    if (queue.length > 0) {
+        queueStep.style.display  = 'block';
+        queueStatusEl.textContent = `${queue.length} bookmark${queue.length === 1 ? '' : 's'} waiting to be written.`;
+    } else {
+        queueStep.style.display = 'none';
+    }
+}
+
+function updatePermissionUI(perm) {
+    if (perm === 'granted') {
+        permStatusEl.textContent  = '✓ Access granted';
+        permStatusEl.className    = 'perm-granted';
+        grantAccessBtn.style.display = 'none';
+    } else {
+        permStatusEl.textContent  = 'Access needed — click Grant after each browser restart.';
+        permStatusEl.className    = 'perm-needed';
+        grantAccessBtn.style.display = 'inline-block';
+    }
+}
+
+// Pick file — showOpenFilePicker gives readwrite permission automatically
 pickFileBtn.addEventListener('click', async () => {
     try {
         const [fileHandle] = await window.showOpenFilePicker({
-            types: [{ description: 'Markdown files', accept: { 'text/markdown': ['.md', '.markdown'] } }],
+            types:    [{ description: 'Markdown files', accept: { 'text/markdown': ['.md', '.markdown'] } }],
             multiple: false,
         });
-        const localEp = registry.getById('local_markdown');
-        await localEp.saveHandle(fileHandle);
-        currentFileEl.textContent = `Current file: ${fileHandle.name}`;
+        const ep = registry.getById('local_markdown');
+        await ep.saveHandle(fileHandle);
+        await refreshLocalMarkdownUI();
     } catch (e) {
         if (e.name !== 'AbortError') {
             currentFileEl.textContent = `Error: ${e.message}`;
@@ -129,42 +173,40 @@ pickFileBtn.addEventListener('click', async () => {
     }
 });
 
-// Flush queued bookmarks — button click is a user gesture so requestPermission works here
-flushBtn.addEventListener('click', async () => {
-    flushResultEl.textContent = 'Flushing...';
-    flushResultEl.className   = '';
-    try {
-        const localEp = registry.getById('local_markdown');
-        await localEp.init({});
-
-        // If permission not yet granted, request it now (button click = user gesture)
-        const perm = await localEp.checkPermission();
-        if (perm === 'no-handle') {
-            flushResultEl.textContent = 'No file selected. Pick a file first.';
-            flushResultEl.className   = 'error';
-            return;
-        }
-        if (perm !== 'granted') {
-            const granted = await localEp.requestPermission();
-            if (!granted) {
-                flushResultEl.textContent = 'File permission denied.';
-                flushResultEl.className   = 'error';
-                return;
-            }
-        }
-
-        const result = await localEp.flushQueue();
-        flushResultEl.textContent = result.message;
-        flushResultEl.className   = result.ok ? '' : 'error';
-    } catch (e) {
-        flushResultEl.textContent = e.message;
-        flushResultEl.className   = 'error';
+// Grant file access — preloadedHandle is already in memory so requestPermission()
+// is the first await and the user-activation requirement is satisfied
+grantAccessBtn.addEventListener('click', async () => {
+    if (!preloadedHandle) return;
+    const perm = await preloadedHandle.requestPermission({ mode: 'readwrite' });
+    updatePermissionUI(perm);
+    if (perm === 'granted') {
+        // Refresh queue step in case there are bookmarks waiting
+        await refreshLocalMarkdownUI();
     }
+});
+
+// Flush queued bookmarks — only reachable after permission is granted
+flushBtn.addEventListener('click', async () => {
+    flushBtn.disabled         = true;
+    queueStatusEl.textContent = 'Writing…';
+    try {
+        const ep     = registry.getById('local_markdown');
+        const result = await ep.flushQueue();
+        if (result.ok) {
+            queueStep.style.display  = 'none';
+            permStatusEl.textContent = `✓ Access granted — last write: ${result.message}`;
+        } else {
+            queueStatusEl.textContent = result.message;
+        }
+    } catch (e) {
+        queueStatusEl.textContent = e.message;
+    }
+    flushBtn.disabled = false;
 });
 
 // Test connection
 testBtn.addEventListener('click', async () => {
-    testResultEl.textContent = 'Testing...';
+    testResultEl.textContent = 'Testing…';
     testResultEl.className   = '';
     try {
         const ep = await registry.getActive();

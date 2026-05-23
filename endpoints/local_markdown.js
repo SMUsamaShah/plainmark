@@ -143,6 +143,12 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         await idbPut(HANDLE_KEY, fileHandle);
     }
 
+    // Exposes the raw handle for pre-loading in UI contexts so requestPermission()
+    // can be called as the first await in a click handler (user gesture requirement)
+    getHandle() {
+        return idbGet(HANDLE_KEY);
+    }
+
     async getFileName() {
         const handle = await idbGet(HANDLE_KEY);
         return handle?.name ?? null;
