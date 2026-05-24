@@ -1,41 +1,57 @@
 {
-   "manifest_version": 2,
-   "name": "HTML Selection",
-   "description": "Gets the HTML of the user's selection",
-   "version": "0.3",
-   
-   "browser_action": {
-      "default_icon": "icon_32.png",
-      "default_title": "Get selected HTML"
-   },
-   "icons": {
-      "32": "icon_32.png"
-   },
-   "permissions": [
-      "http://*/*",
-      "https://*/*",
-      "tabs",
-      "contextMenus",
-      "storage"
-   ],
-   "background": {
-      "scripts": [
-         "util.js", 
-         "dynalist.js",
-         "background.js"
-      ]
-   },
-   "content_scripts": [ 
-      {
-         "matches": [
-            "http://*/*", 
-            "https://*/*",
-            "*://*/*"
-         ],
-         "js": ["content_script.js"]
-       }
-   ],
-   "web_accessible_resources": [
-      "popup.html"
-   ]
+  "manifest_version": 3,
+  "name": "Plainmark",
+  "description": "Frictionless plain-text bookmarking to Dynalist, Workflowy, or a local Markdown file",
+  "version": "1.0",
+
+  "action": {
+    "default_icon": "icon_32.png",
+    "default_title": "Save bookmark"
+  },
+  "icons": {
+    "32": "icon_32.png"
+  },
+
+  "permissions": [
+    "tabs",
+    "contextMenus",
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content_script.js"]
+  }],
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "web_accessible_resources": [{
+    "resources": [
+      "popup.html",
+      "popup.js",
+      "popup.css",
+      "util.js",
+      "endpoints/base.js",
+      "endpoints/registry.js",
+      "endpoints/dynalist.js",
+      "endpoints/workflowy.js",
+      "endpoints/local_markdown.js",
+      "endpoints/downloads_file.js",
+      "endpoints/browser_storage.js"
+    ],
+    "matches": ["http://*/*", "https://*/*"]
+  }]
 }

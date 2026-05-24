@@ -1,121 +1,75 @@
-const TOKEN = "AZ04qOZcfjEpC6F-LpE7twR3ItqGKXjXx4msLPujsJFiXMdkIpj70E_JuHoC8Nyhlp7yy9bAB7GneUADirS00oLNezFoBv8kIhvX217Zt8rHYiYCC2MORzG57VKQL6hO";
-const dl = new Dynalist(TOKEN);
+import { registry }    from './endpoints/registry.js';
+import { getURLTitle } from './util.js';
 
-let pageMenu; 
-let linkMenu;
-let selectedTextMenu;
-
-pageMenu = chrome.contextMenus.create({
-    "title": "Save page to Dynalist", 
-    "contexts": ["page"],
-    "onclick": (info, tab) => {
-        dl.add(tab.title + " " + tab.url, null);
-        //updateChromeMenu(item);
-    }
-});
-
-linkMenu = chrome.contextMenus.create({
-    "title": "Save link to Dynalist", 
-    "contexts": ["link"],
-    "onclick": async (info, tab) => {
-        let urlTitle = await getURLTitle(info.linkUrl);
-        let title = info.linkUrl;
-        if (urlTitle) {
-            title = urlTitle + " " + title;
-        }
-        dl.add(title, `Source: ${tab.title} ${tab.url}`);
-    }
-})
-
-
-selectedTextMenu = chrome.contextMenus.create({
-    "title": "Save '%s' to note", 
-    "contexts": ["selection"],
-    "onclick": (info, tab) => {
-        // console.log("item " + info.menuItemId + " was clicked");
-        // console.log("info: " + JSON.stringify(info));
-        // console.log("tab: " + JSON.stringify(tab));
-    
-        let title = info.selectionText;
-        let description = tab.title + " " + tab.url;
-    
-        dl.add(title, description);
-        addContextMenu(title);
-    }
-});
-
-let appendNoteMenu;
-function addContextMenu(text) {
-    appendNoteMenu = chrome.contextMenus.create({
-        "title": "Append '%s' to " + text, 
-        "contexts": ["selection"],
-        "onclick": (info, tab) => {
-            dl.append(info.selectionText);
-        }
-    });
-}
-
-function updateContextMenu(menuID) {
-    chrome.contextMenus.update(menuID, {
-        "title": "Append '%s' to " + text, 
-        "contexts": ["selection"],
-        "onclick": (info, tab) => {
-            dl.append(info.selectionText);
-        }
-    });
-}
-
-//--------------------------- browser listener -------------------------------
-
-// what extension button is clicked
-chrome.browserAction.onClicked.addListener(function(tab) {
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
-        chrome.tabs.sendMessage(tabs[0].id, {"message": "openpopup"});  
+// Create context menus once on install/update to avoid "already exists" errors
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.removeAll(() => {
+        chrome.contextMenus.create({ id: 'save-page',      title: 'Save page',    contexts: ['page'] });
+        chrome.contextMenus.create({ id: 'save-link',      title: 'Save link',    contexts: ['link'] });
+        chrome.contextMenus.create({ id: 'save-selection', title: "Save '%s'",    contexts: ['selection'] });
     });
 });
 
-// chrome message listener
+// All context menu saves open the popup with prefilled data so the user can add notes
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    let data = {};
+
+    if (info.menuItemId === 'save-page') {
+        data = { title: tab.title, url: tab.url };
+
+    } else if (info.menuItemId === 'save-link') {
+        let linkTitle = '';
+        try { linkTitle = await getURLTitle(info.linkUrl); } catch (_) {}
+        data = {
+            title: linkTitle || info.linkUrl,
+            url:   info.linkUrl,
+            note:  `Source: ${tab.title} ${tab.url}`,
+        };
+
+    } else if (info.menuItemId === 'save-selection') {
+        data = {
+            title: info.selectionText,
+            url:   tab.url,
+            note:  `${tab.title} ${tab.url}`,
+        };
+    }
+
+    chrome.tabs.sendMessage(tab.id, { message: 'openpopup', data });
+});
+
+// Icon click: open popup with current tab data (pass title+url so popup doesn't need to query tabs)
+chrome.action.onClicked.addListener((tab) => {
+    chrome.tabs.sendMessage(tab.id, {
+        message: 'openpopup',
+        data: { title: tab.title, url: tab.url },
+    });
+});
+
+// Message handler for popup ↔ service worker communication
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    handleMessage(request)
+        .then(sendResponse)
+        .catch(e => sendResponse({ error: e.message }));
+    return true; // keep channel open for async response
+});
+
+async function handleMessage(request) {
+    const endpoint = await registry.getActive();
+
     switch (request.message) {
-        case "files":
-            sendResponse({"files": Dynalist.files, "selectionID": dl.fileID});
-            break;
+        case 'getConfig':
+            return { endpointId: endpoint.id, endpointName: endpoint.name };
 
-        case "nodes":
-            dl.getNodes(request.fileID, (nodes) => {
-                sendResponse({"nodes": nodes, "selectionID": dl.inboxNodeID});
-            }, (error) => {
-                sendResponse({"error": "Error occured while trying to get nodes"});
-            });
-            break;
+        case 'add':
+            return endpoint.add(request.title, request.url, request.note);
 
-        case "add":
-            dl.add(request.title + " " + request.url, null, (newNodeID) => {
-                sendResponse({"newNodeID": newNodeID});
-            }, (error) => {
-                sendResponse({"error": "Error occured while trying to add"});
-            });
-            break;
+        case 'update':
+            return endpoint.update(request.id, request.note);
 
-        case "update":
-            dl.update(request.nodeID, request.description, (newNodeID) => {
-                sendResponse({"newNodeID": newNodeID});
-            }, (error) => {
-                sendResponse({"error": "Error occured while trying to add"});
-            });
-            break;
-        
-        case "delete":
-            dl.delete(request.nodeID, (response) => {
-                sendResponse({"message": response});
-            }, (error) => {
-                sendResponse({"error": "Error occured while trying to delete"});
-            });
-            break;
+        case 'delete':
+            return endpoint.delete(request.id);
 
         default:
-            break;
+            return { error: `unknown message: ${request.message}` };
     }
-
-    return true;
-});
+}

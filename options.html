@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Plainmark Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header>
+    <h1>Plainmark Settings</h1>
+  </header>
+
+  <main>
+    <section id="endpoint-section">
+      <h2>Active Endpoint</h2>
+      <select id="endpoint-select"></select>
+      <div id="endpoint-warning" style="display:none"></div>
+    </section>
+
+    <section id="settings-section">
+      <h2 id="settings-heading">Settings</h2>
+      <form id="settings-form"></form>
+
+      <!-- Browser Storage only: shown in place of the form -->
+      <div id="browser-storage-area" style="display:none">
+        <div class="step">
+          <span class="step-label">Stored bookmarks</span>
+          <div id="bs-count"></div>
+        </div>
+        <div class="step">
+          <span class="step-label">Export</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" id="bs-copy-md-btn">Copy as Markdown</button>
+            <button type="button" id="bs-copy-json-btn">Copy as JSON</button>
+            <button type="button" id="bs-download-btn">Download .md</button>
+          </div>
+          <div id="bs-export-result" style="font-size:12px;color:#27ae60;margin-top:4px"></div>
+        </div>
+        <div class="step">
+          <span class="step-label">Danger zone</span>
+          <button type="button" id="bs-clear-btn" class="btn-danger">Clear all bookmarks</button>
+        </div>
+      </div>
+
+      <!-- Local Markdown only: shown in place of the form -->
+      <div id="file-picker-area" style="display:none">
+
+        <div class="step">
+          <span class="step-label">1 · Choose file</span>
+          <div id="current-file">No file chosen.</div>
+          <button type="button" id="pick-file-btn">Pick Markdown File</button>
+        </div>
+
+        <div class="step" id="grant-step" style="display:none">
+          <span class="step-label">2 · Grant access <small>(once per browser session)</small></span>
+          <div id="permission-status"></div>
+          <button type="button" id="grant-access-btn" style="display:none">Grant file access</button>
+        </div>
+
+        <div class="step" id="queue-step" style="display:none">
+          <span class="step-label">3 · Pending bookmarks</span>
+          <div id="queue-status"></div>
+          <button type="button" id="flush-btn">Write to file now</button>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="test-section">
+      <button type="button" id="test-btn">Test Connection</button>
+      <span id="test-result"></span>
+    </section>
+  </main>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>

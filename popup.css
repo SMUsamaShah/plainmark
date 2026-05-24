@@ -1,36 +1,101 @@
-body {
-    min-width: 300px;
-    font-size: 15px;
-    opacity: 1;
-    background: white;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-html {
-    border: 1px solid rgba(0,0,0,0.2);
-    /* -webkit-border-radius: 2px; */
-    border-radius: 2px;
-    /* -webkit-box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.2), 0 1px 5px 0 rgba(0,0,0,0.12); */
-    /* box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.2), 0 1px 5px 0 rgba(0,0,0,0.12); */
-    /* left: 0;
-    margin: 4px 8px 8px 4px;
-    opacity: 0;
-    position: fixed;
-    top: 0;
-    -webkit-transform: translateY(-30px);
-    transform: translateY(-30px);
-    -webkit-transition: background-color .218s linear,opacity .218s ease-in,transform .218s ease-in;
-    transition: background-color .218s linear,opacity .218s ease-in,transform .218s ease-in;
-    width: 360px; */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background: #fff;
+  width: 340px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 #title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  flex: 1;
+  font-weight: 600;
+  font-size: 12px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-  
 
-input {
-    margin: 5px;
-    outline: none;
+#settingsBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  color: #888;
+  padding: 0 2px;
+  line-height: 1;
+}
+#settingsBtn:hover { color: #333; }
+
+#note {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+}
+#note:focus { border-color: #4a90e2; }
+
+#footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 20px;
+}
+
+#status {
+  font-size: 11px;
+  color: #666;
+}
+#status.error { color: #c0392b; }
+#status.saved { color: #27ae60; }
+
+#actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#deleteBtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #e74c3c;
+  background: none;
+  color: #e74c3c;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#deleteBtn:hover { background: #e74c3c; color: #fff; }
+
+#closeBtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #aaa;
+  background: none;
+  color: #666;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#closeBtn:hover { background: #f0f0f0; }
+
+#endpoint-label {
+  font-size: 10px;
+  color: #aaa;
+  font-style: italic;
 }
