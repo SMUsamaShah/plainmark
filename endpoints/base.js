@@ -2,6 +2,9 @@ export class BookmarkEndpoint {
     get id()   { throw new Error('not implemented'); }
     get name() { throw new Error('not implemented'); }
 
+    // Optional warning shown in the options page below the endpoint selector
+    get warning() { return null; }
+
     // Array of { key, label, type ('text'|'password'|'checkbox'), required, placeholder }
     get settingsSchema() { return []; }
 

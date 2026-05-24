@@ -1,7 +1,8 @@
 import { registry } from './endpoints/registry.js';
 
-const endpointRadiosEl  = document.getElementById('endpoint-radios');
-const settingsFormEl    = document.getElementById('settings-form');
+const endpointSelectEl   = document.getElementById('endpoint-select');
+const endpointWarningEl  = document.getElementById('endpoint-warning');
+const settingsFormEl     = document.getElementById('settings-form');
 const settingsHeading   = document.getElementById('settings-heading');
 const filePickerArea    = document.getElementById('file-picker-area');
 const currentFileEl     = document.getElementById('current-file');
@@ -34,36 +35,24 @@ function debounce(fn, ms) {
 
 async function init() {
     const activeId = await registry.getActiveId();
-    renderEndpointRadios(activeId);
+    renderEndpointSelect(activeId);
     await renderSettingsForm(activeId);
 }
 
-function renderEndpointRadios(activeId) {
-    endpointRadiosEl.innerHTML = '';
+function renderEndpointSelect(activeId) {
+    endpointSelectEl.innerHTML = '';
     for (const ep of registry.getAll()) {
-        const label = document.createElement('label');
-        label.className = 'endpoint-radio' + (ep.id === activeId ? ' active' : '');
-
-        const radio = document.createElement('input');
-        radio.type    = 'radio';
-        radio.name    = 'endpoint';
-        radio.value   = ep.id;
-        radio.checked = ep.id === activeId;
-
-        radio.addEventListener('change', async () => {
-            await registry.setActiveId(ep.id);
-            document.querySelectorAll('.endpoint-radio').forEach(el => el.classList.remove('active'));
-            label.classList.add('active');
-            await renderSettingsForm(ep.id);
-        });
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className   = 'ep-name';
-        nameSpan.textContent = ep.name;
-
-        label.append(radio, nameSpan);
-        endpointRadiosEl.appendChild(label);
+        const option = document.createElement('option');
+        option.value    = ep.id;
+        option.text     = ep.name;
+        option.selected = ep.id === activeId;
+        endpointSelectEl.appendChild(option);
     }
+    endpointSelectEl.addEventListener('change', async () => {
+        const id = endpointSelectEl.value;
+        await registry.setActiveId(id);
+        await renderSettingsForm(id);
+    });
 }
 
 async function renderSettingsForm(endpointId) {
@@ -76,6 +65,13 @@ async function renderSettingsForm(endpointId) {
     browserStorageArea.style.display  = 'none';
     testResultEl.textContent          = '';
     testResultEl.className            = '';
+
+    if (ep.warning) {
+        endpointWarningEl.textContent    = ep.warning;
+        endpointWarningEl.style.display  = 'block';
+    } else {
+        endpointWarningEl.style.display  = 'none';
+    }
 
     for (const field of ep.settingsSchema) {
         const wrapper = document.createElement('div');

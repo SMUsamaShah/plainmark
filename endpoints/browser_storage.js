@@ -6,6 +6,10 @@ export class BrowserStorageEndpoint extends BookmarkEndpoint {
     get id()   { return 'browser_storage'; }
     get name() { return 'Browser Storage'; }
 
+    get warning() {
+        return 'Not recommended — storage is tied to this extension installation and can be cleared by Chrome or lost on reinstall.';
+    }
+
     get settingsSchema() { return []; }
 
     async init() {}
