@@ -6,6 +6,14 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
     get id()   { return 'workflowy'; }
     get name() { return 'Workflowy'; }
 
+    get links() {
+        return [
+            { label: 'Create Account', url: 'https://workflowy.com/signup/' },
+            { label: 'Get API Key',    url: 'https://beta.workflowy.com/api-key/' },
+            { label: 'API Docs',       url: 'https://beta.workflowy.com/api-reference/' },
+        ];
+    }
+
     get settingsSchema() {
         return [
             { key: 'token',    label: 'API Token (wfpak_...)', type: 'password', required: true,  placeholder: 'Get from beta.workflowy.com/api-key' },

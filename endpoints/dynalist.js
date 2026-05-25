@@ -7,6 +7,14 @@ export class DynalistEndpoint extends BookmarkEndpoint {
     get id()   { return 'dynalist'; }
     get name() { return 'Dynalist'; }
 
+    get links() {
+        return [
+            { label: 'Create Account', url: 'https://dynalist.io/signup' },
+            { label: 'Get API Key',    url: 'https://dynalist.io/developer' },
+            { label: 'API Docs',       url: 'https://apidocs.dynalist.io/' },
+        ];
+    }
+
     get settingsSchema() {
         return [
             { key: 'token',       label: 'API Token',    type: 'password', required: true,  placeholder: 'Get from dynalist.io/developer' },

@@ -5,6 +5,9 @@ export class BookmarkEndpoint {
     // Optional warning shown in the options page below the endpoint selector
     get warning() { return null; }
 
+    // Optional array of { label, url } links shown below the endpoint selector
+    get links() { return []; }
+
     // Array of { key, label, type ('text'|'password'|'checkbox'), required, placeholder }
     get settingsSchema() { return []; }
 

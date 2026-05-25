@@ -2,6 +2,7 @@ import { registry } from './endpoints/registry.js';
 
 const endpointSelectEl   = document.getElementById('endpoint-select');
 const endpointWarningEl  = document.getElementById('endpoint-warning');
+const endpointLinksEl    = document.getElementById('endpoint-links');
 const settingsFormEl     = document.getElementById('settings-form');
 const settingsHeading   = document.getElementById('settings-heading');
 const filePickerArea    = document.getElementById('file-picker-area');
@@ -69,10 +70,19 @@ async function renderSettingsForm(endpointId) {
     testResultEl.className            = '';
 
     if (ep.warning) {
-        endpointWarningEl.textContent    = ep.warning;
-        endpointWarningEl.style.display  = 'block';
+        endpointWarningEl.textContent   = ep.warning;
+        endpointWarningEl.style.display = 'block';
     } else {
-        endpointWarningEl.style.display  = 'none';
+        endpointWarningEl.style.display = 'none';
+    }
+
+    if (ep.links.length) {
+        endpointLinksEl.innerHTML = ep.links
+            .map(({ label, url }) => `<span class="ep-link-label">${label}:</span> <a href="${url}" target="_blank" rel="noopener">${url}</a>`)
+            .join('<br>');
+        endpointLinksEl.style.display = 'block';
+    } else {
+        endpointLinksEl.style.display = 'none';
     }
 
     for (const field of ep.settingsSchema) {
