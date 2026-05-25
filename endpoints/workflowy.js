@@ -34,7 +34,7 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
         };
     }
 
-    async getNodes(parentId = 'inbox') {
+    async getNodes(parentId = 'None') {
         if (!this._token) return null;
         const res = await fetch(`${BASE}/nodes?parent_id=${encodeURIComponent(parentId)}`, { headers: this._headers() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

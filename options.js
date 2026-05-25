@@ -128,37 +128,77 @@ async function renderSettingsForm(endpointId) {
             browseBtn.textContent = 'Browse nodes…';
             browseBtn.className   = 'btn-secondary';
 
+            const navRow = document.createElement('div');
+            navRow.className    = 'browse-nav';
+            navRow.style.display = 'none';
+
+            const backBtn = document.createElement('button');
+            backBtn.type        = 'button';
+            backBtn.textContent = '← Back';
+            backBtn.className   = 'btn-secondary';
+            backBtn.style.display = 'none';
+
             const nodeSelect = document.createElement('select');
-            nodeSelect.className    = 'node-select';
-            nodeSelect.style.display = 'none';
+            nodeSelect.className = 'node-select';
+
+            const enterBtn = document.createElement('button');
+            enterBtn.type        = 'button';
+            enterBtn.textContent = 'Enter →';
+            enterBtn.className   = 'btn-secondary';
+            enterBtn.title       = 'Browse into selected node';
 
             const useBtn = document.createElement('button');
-            useBtn.type          = 'button';
-            useBtn.textContent   = 'Use selected';
-            useBtn.className     = 'btn-secondary';
-            useBtn.style.display = 'none';
+            useBtn.type        = 'button';
+            useBtn.textContent = 'Use';
+            useBtn.className   = 'btn-secondary';
 
-            browseBtn.addEventListener('click', async () => {
+            navRow.append(backBtn, nodeSelect, enterBtn, useBtn);
+            browseRow.append(browseBtn, navRow);
+
+            // path is a stack of {id, label} for the Back button
+            const path = [];
+
+            const loadNodes = async (parentId) => {
                 browseBtn.disabled    = true;
                 browseBtn.textContent = 'Loading…';
                 try {
                     const ep    = await registry.getInitialized(endpointId);
-                    const nodes = await ep.getNodes();
-                    if (!nodes?.length) {
-                        browseBtn.textContent = 'No nodes found';
-                        browseBtn.disabled    = false;
+                    const nodes = await ep.getNodes(parentId);
+                    if (nodes === null) {
+                        browseBtn.textContent = 'Not supported';
+                        return;
+                    }
+                    if (!nodes.length) {
+                        browseBtn.textContent = 'No child nodes';
                         return;
                     }
                     nodeSelect.innerHTML = nodes
                         .map(n => `<option value="${n.id}">${n.label || n.id}</option>`)
                         .join('');
-                    nodeSelect.style.display = 'block';
-                    useBtn.style.display     = 'inline-block';
-                    browseBtn.textContent    = 'Refresh';
+                    navRow.style.display  = 'flex';
+                    backBtn.style.display = path.length ? 'inline-block' : 'none';
+                    browseBtn.textContent = 'Refresh';
                 } catch (e) {
                     browseBtn.textContent = `Error: ${e.message}`;
                 }
                 browseBtn.disabled = false;
+            };
+
+            browseBtn.addEventListener('click', () => {
+                path.length = 0;
+                loadNodes(undefined); // endpoint default (root)
+            });
+
+            enterBtn.addEventListener('click', () => {
+                const selectedId    = nodeSelect.value;
+                const selectedLabel = nodeSelect.options[nodeSelect.selectedIndex]?.text ?? selectedId;
+                path.push({ id: selectedId, label: selectedLabel });
+                loadNodes(selectedId);
+            });
+
+            backBtn.addEventListener('click', () => {
+                path.pop();
+                loadNodes(path.length ? path[path.length - 1].id : undefined);
             });
 
             useBtn.addEventListener('click', async () => {
@@ -168,7 +208,6 @@ async function renderSettingsForm(endpointId) {
                 await registry.saveSettings(endpointId, current);
             });
 
-            browseRow.append(browseBtn, nodeSelect, useBtn);
             wrapper.appendChild(browseRow);
         }
 

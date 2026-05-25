@@ -121,10 +121,16 @@ button:hover { background: #357abd; border-color: #357abd; }
 /* Node browser */
 .browse-row {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.browse-nav {
+  display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
 }
 
 .btn-secondary {
