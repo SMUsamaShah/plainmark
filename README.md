@@ -1,12 +1,12 @@
 # Plainmark
 
-Chrome extension for saving bookmarks as plain text. MV3.
+Chrome extension to save URLs (with title and a note) to various plain text targets (local makdown file, Workflowy, Dynalist).
 
-## What it does
+## Usage
 
 - Click the extension icon or right-click → save the current page, a link, or selected text
 - A small popup appears for adding a note before/after saving
-- Bookmarks are saved to whichever endpoint is active in settings
+- Bookmarks are saved to the target endpoint that is active in settings
 
 ## Endpoints
 
