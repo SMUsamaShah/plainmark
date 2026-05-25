@@ -10,9 +10,6 @@ const pickFileBtn       = document.getElementById('pick-file-btn');
 const grantStep         = document.getElementById('grant-step');
 const permStatusEl      = document.getElementById('permission-status');
 const grantAccessBtn    = document.getElementById('grant-access-btn');
-const queueStep         = document.getElementById('queue-step');
-const queueStatusEl     = document.getElementById('queue-status');
-const flushBtn          = document.getElementById('flush-btn');
 const testBtn           = document.getElementById('test-btn');
 const testResultEl      = document.getElementById('test-result');
 const migrateSourceEl   = document.getElementById('migrate-source');
@@ -125,47 +122,31 @@ async function renderSettingsForm(endpointId) {
     }
 }
 
-// Refresh the entire local_markdown UI: file name, permission status, queue count
 async function refreshLocalMarkdownUI() {
     const ep = registry.getById('local_markdown');
 
-    // Pre-load handle (safe to do without user gesture)
     preloadedHandle = await ep.getHandle();
 
     if (!preloadedHandle) {
-        currentFileEl.textContent  = 'No file chosen.';
-        grantStep.style.display    = 'none';
-        queueStep.style.display    = 'none';
+        currentFileEl.textContent = 'No file chosen.';
+        grantStep.style.display   = 'none';
         return;
     }
 
-    // Step 1: show filename
     currentFileEl.textContent = `✓ ${preloadedHandle.name}`;
-
-    // Step 2: permission
-    grantStep.style.display = 'block';
+    grantStep.style.display   = 'block';
     const perm = await preloadedHandle.queryPermission({ mode: 'readwrite' });
     updatePermissionUI(perm);
-
-    // Step 3: queue
-    const stored = await chrome.storage.local.get('localMarkdownQueue');
-    const queue  = stored['localMarkdownQueue'] ?? [];
-    if (queue.length > 0) {
-        queueStep.style.display  = 'block';
-        queueStatusEl.textContent = `${queue.length} bookmark${queue.length === 1 ? '' : 's'} waiting to be written.`;
-    } else {
-        queueStep.style.display = 'none';
-    }
 }
 
 function updatePermissionUI(perm) {
     if (perm === 'granted') {
-        permStatusEl.textContent  = '✓ Access granted';
-        permStatusEl.className    = 'perm-granted';
+        permStatusEl.textContent     = '✓ Access granted';
+        permStatusEl.className       = 'perm-granted';
         grantAccessBtn.style.display = 'none';
     } else {
-        permStatusEl.textContent  = 'Access needed — click Grant after each browser restart.';
-        permStatusEl.className    = 'perm-needed';
+        permStatusEl.textContent     = 'Access needed — click Grant after each browser restart.';
+        permStatusEl.className       = 'perm-needed';
         grantAccessBtn.style.display = 'inline-block';
     }
 }
@@ -193,29 +174,6 @@ grantAccessBtn.addEventListener('click', async () => {
     if (!preloadedHandle) return;
     const perm = await preloadedHandle.requestPermission({ mode: 'readwrite' });
     updatePermissionUI(perm);
-    if (perm === 'granted') {
-        // Refresh queue step in case there are bookmarks waiting
-        await refreshLocalMarkdownUI();
-    }
-});
-
-// Flush queued bookmarks — only reachable after permission is granted
-flushBtn.addEventListener('click', async () => {
-    flushBtn.disabled         = true;
-    queueStatusEl.textContent = 'Writing…';
-    try {
-        const ep     = registry.getById('local_markdown');
-        const result = await ep.flushQueue();
-        if (result.ok) {
-            queueStep.style.display  = 'none';
-            permStatusEl.textContent = `✓ Access granted — last write: ${result.message}`;
-        } else {
-            queueStatusEl.textContent = result.message;
-        }
-    } catch (e) {
-        queueStatusEl.textContent = e.message;
-    }
-    flushBtn.disabled = false;
 });
 
 // Browser Storage UI
@@ -310,16 +268,7 @@ migrateBtnEl.addEventListener('click', async () => {
             await dest.add(title, url, note);
         }
 
-        let message = `Migrated ${items.length} bookmark(s) to ${dest.name}.`;
-
-        if (destId === 'local_markdown') {
-            const flush = await dest.flushQueue();
-            message += flush.ok
-                ? ` File updated.`
-                : ` ${flush.message}`;
-        }
-
-        migrateResultEl.textContent = message;
+        migrateResultEl.textContent = `Migrated ${items.length} bookmark(s) to ${dest.name}.`;
         migrateResultEl.className   = 'ok';
 
         if (destId === 'browser_storage') await refreshBrowserStorageUI();

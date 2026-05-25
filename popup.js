@@ -84,30 +84,19 @@ deleteBtn.addEventListener('click', async () => {
 // requestPermission() requires a top-level browsing context and cannot be called
 // from an iframe — direct the user to the options page (a real tab) instead.
 
-async function handleLocalMarkdownFlush(ep) {
-    const result = await ep.flushQueue();
-    if (result.needsPermission) {
-        // Can't request permission from an iframe — send user to options page
-        const name = preloadedHandle?.name ?? 'your file';
-        setStatus(`Queued. Open ⚙ Options → Grant access to ${name}`, '');
-    } else if (result.ok && result.count > 0) {
-        setStatus(`Saved to ${preloadedHandle?.name ?? 'file'}`, 'saved');
-    } else if (!result.ok) {
-        setStatus(result.message, 'error');
-    }
-}
-
 async function saveBookmark(title, url) {
     setStatus('Saving…');
     try {
-        const res = await sendMsg({ message: 'add', title, url, note: noteBox.value });
-        savedId = res.id;
-        setStatus('Saved', 'saved');
-        deleteBtn.style.display = 'inline-block';
-
+        let res;
         if (activeEndpointId === 'local_markdown') {
-            await handleLocalMarkdownFlush(registry.getById('local_markdown'));
+            res = await registry.getById('local_markdown').add(title, url, noteBox.value);
+            setStatus(`Saved to ${preloadedHandle?.name ?? 'file'}`, 'saved');
+        } else {
+            res = await sendMsg({ message: 'add', title, url, note: noteBox.value });
+            setStatus('Saved', 'saved');
         }
+        savedId = res.id;
+        deleteBtn.style.display = 'inline-block';
     } catch (e) {
         setStatus(e.message, 'error');
     }
