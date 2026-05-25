@@ -31,6 +31,28 @@ export class DynalistEndpoint extends BookmarkEndpoint {
         this._inboxNodeId = inboxNodeId || '';
     }
 
+    // Send all inserts in a single /doc/edit request
+    async addMany(items) {
+        if (!items.length) return;
+        if (this._useInbox || !this._fileId) {
+            return super.addMany(items); // inbox API is single-add only
+        }
+        const changes = items.map(({ title, url, note }) => ({
+            action:    'insert',
+            parent_id: this._inboxNodeId,
+            index:     -1,
+            content:   url ? `${title} ${url}` : title,
+            note:      note || '',
+            checked:   false,
+        }));
+        const res = await postJson(`${BASE}/doc/edit`, {
+            token:   this._token,
+            file_id: this._fileId,
+            changes,
+        });
+        if (res._code !== 'Ok') throw new Error(res._code);
+    }
+
     async add(title, url, note) {
         const content = url ? `${title} ${url}` : title;
         const noteText = note || '';

@@ -367,9 +367,7 @@ migrateBtnEl.addEventListener('click', async () => {
         migrateResultEl.textContent = `Migrating ${items.length} bookmark(s)…`;
         const dest = await registry.getInitialized(destId);
 
-        for (const { title, url, note } of items) {
-            await dest.add(title, url, note);
-        }
+        await dest.addMany(items);
 
         migrateResultEl.textContent = `Migrated ${items.length} bookmark(s) to ${dest.name}.`;
         migrateResultEl.className   = 'ok';

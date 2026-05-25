@@ -3,10 +3,12 @@ import { WorkflowyEndpoint }      from './workflowy.js';
 import { LocalMarkdownEndpoint }  from './local_markdown.js';
 import { DownloadsFileEndpoint }  from './downloads_file.js';
 import { BrowserStorageEndpoint } from './browser_storage.js';
+import { GistEndpoint }           from './gist.js';
 
 const ALL_ENDPOINTS = [
     new DynalistEndpoint(),
     new WorkflowyEndpoint(),
+    new GistEndpoint(),
     new LocalMarkdownEndpoint(),
     new DownloadsFileEndpoint(),
     new BrowserStorageEndpoint(),

@@ -30,4 +30,16 @@ export class BookmarkEndpoint {
 
     // Returns null if not supported, or [{id, label}] for the node picker
     async getNodes()             { return null; }
+
+    // Milliseconds to wait between sequential add() calls in addMany()
+    get addDelay()               { return 0; }
+
+    // Add multiple bookmarks. Endpoints with a bulk API should override this.
+    // The default implementation calls add() sequentially, respecting addDelay.
+    async addMany(items) {
+        for (let i = 0; i < items.length; i++) {
+            if (i > 0 && this.addDelay) await new Promise(r => setTimeout(r, this.addDelay));
+            await this.add(items[i].title, items[i].url, items[i].note);
+        }
+    }
 }

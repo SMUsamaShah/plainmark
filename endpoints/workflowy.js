@@ -15,6 +15,8 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
         ];
     }
 
+    get addDelay() { return 500; } // ~120/min, well under rate limit
+
     get settingsSchema() {
         return [
             { key: 'token',    label: 'API Token (wfpak_...)', type: 'password', required: true,  placeholder: 'Get from beta.workflowy.com/api-key' },
