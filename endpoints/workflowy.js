@@ -45,8 +45,7 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
     }
 
     async add(title, url, note) {
-        // Use markdown link syntax in the name field
-        const name = url ? `[${title}](${url})` : title;
+        const name = url ? `${title} ${url}` : title;
         const res = await fetch(`${BASE}/nodes`, {
             method:  'POST',
             headers: this._headers(),
@@ -54,7 +53,7 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
                 parent_id: this._parentId,
                 name:      name,
                 note:      note || '',
-                position:  'top',
+                position:  'bottom',
             }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
