@@ -35,7 +35,7 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
                 parent_id: this._parentId,
                 name:      name,
                 note:      note || '',
-                position:  0,
+                position:  'top',
             }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
