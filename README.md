@@ -42,4 +42,6 @@ Made this to work with Dynalist originally where I could dump any interesting UR
   (Not sure if it should be done at all, bookmarks are mostly a url dump)
 - Categories.
   (Probably a bad idea, this will become increasingly complex based on target endpoint. Markdown needs headings and putting a link under that heading. Dynalist/workflowy will require specifying each node ID for that category. Yeah bad idea)
+- Customise bookmark format.  
+  (it will be nice to let user customise the exact format of the bookmark. but what happens to existing bookmarks then? it will make migration to a different end point complicated if we allow changing the format. One way could be to customise format at the beginning. But there is no way to know the beginning. User might have reinstalled the extension and there are already bookmarks in an existing format. I think we shouldn't make it customisable)
   
