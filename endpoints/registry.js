@@ -49,4 +49,11 @@ export const registry = {
         const key = `${id}Settings`;
         await chrome.storage.sync.set({ [key]: settings });
     },
+
+    async getInitialized(id) {
+        const ep       = this.getById(id);
+        const settings = await this.getSettings(id);
+        await ep.init(settings);
+        return ep;
+    },
 };

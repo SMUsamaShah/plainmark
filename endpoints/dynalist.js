@@ -85,6 +85,31 @@ export class DynalistEndpoint extends BookmarkEndpoint {
         return res.nodes.filter(n => n.id !== 'root').map(n => ({ id: n.id, label: n.content }));
     }
 
+    async list() {
+        if (!this._token || !this._fileId) return null;
+        const res = await postJson(`${BASE}/doc/read`, { token: this._token, file_id: this._fileId });
+        if (res._code !== 'Ok') throw new Error(res._code);
+
+        let nodes = res.nodes.filter(n => n.id !== 'root');
+
+        if (this._inboxNodeId) {
+            const parent = res.nodes.find(n => n.id === this._inboxNodeId);
+            if (parent?.children?.length) {
+                const childIds = new Set(parent.children);
+                nodes = nodes.filter(n => childIds.has(n.id));
+            }
+        }
+
+        return nodes.map(n => {
+            const content  = n.content || '';
+            const note     = n.note || '';
+            const urlMatch = content.match(/(https?:\/\/\S+)$/);
+            const url      = urlMatch ? urlMatch[1] : '';
+            const title    = url ? content.slice(0, -url.length).trimEnd() : content;
+            return { title, url, note };
+        });
+    }
+
     async test() {
         try {
             const res = await postJson(`${BASE}/file/list`, { token: this._token });

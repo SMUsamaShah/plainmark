@@ -52,6 +52,11 @@ export class BrowserStorageEndpoint extends BookmarkEndpoint {
         await this._save([]);
     }
 
+    async list() {
+        const all = await this._load();
+        return all.map(({ title, url, note }) => ({ title, url: url || '', note: note || '' }));
+    }
+
     toMarkdown(list) {
         return list.map(b => {
             let line = b.url ? `- [${b.title}](${b.url})` : `- ${b.title}`;

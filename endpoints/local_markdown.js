@@ -161,6 +161,23 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { ok: true, message: `File: ${handle.name} (permission: ${perm})` };
     }
 
+    async list() {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) return null;
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') throw new Error('File access not granted. Click "Grant file access" above first.');
+
+        const file    = await handle.getFile();
+        const content = await file.text();
+        const results = [];
+        const re = /^- (?:\[([^\]]+)\]\(([^)]+)\)|([^\n\[]+?)) <!-- bm:[a-f0-9-]+ -->(?:\n  > ([^\n]*))?/gm;
+        let m;
+        while ((m = re.exec(content)) !== null) {
+            results.push({ title: m[1] || m[3] || '', url: m[2] || '', note: m[4] || '' });
+        }
+        return results;
+    }
+
     _formatEntry({ id, title, url, note }) {
         let line = url
             ? `- [${title}](${url}) <!-- bm:${id} -->`

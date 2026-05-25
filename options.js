@@ -15,6 +15,10 @@ const queueStatusEl     = document.getElementById('queue-status');
 const flushBtn          = document.getElementById('flush-btn');
 const testBtn           = document.getElementById('test-btn');
 const testResultEl      = document.getElementById('test-result');
+const migrateSourceEl   = document.getElementById('migrate-source');
+const migrateDestEl     = document.getElementById('migrate-dest');
+const migrateBtnEl      = document.getElementById('migrate-btn');
+const migrateResultEl   = document.getElementById('migrate-result');
 const browserStorageArea = document.getElementById('browser-storage-area');
 const bsCountEl          = document.getElementById('bs-count');
 const bsCopyMdBtn        = document.getElementById('bs-copy-md-btn');
@@ -37,6 +41,7 @@ async function init() {
     const activeId = await registry.getActiveId();
     renderEndpointSelect(activeId);
     await renderSettingsForm(activeId);
+    renderMigrateSelects(activeId);
 }
 
 function renderEndpointSelect(activeId) {
@@ -257,6 +262,73 @@ bsClearBtn.addEventListener('click', async () => {
     const ep = registry.getById('browser_storage');
     await ep.clear();
     await refreshBrowserStorageUI();
+});
+
+// Migrate section
+function renderMigrateSelects(activeId) {
+    for (const ep of registry.getAll()) {
+        const srcOpt  = document.createElement('option');
+        srcOpt.value  = ep.id;
+        srcOpt.text   = ep.name;
+        migrateSourceEl.appendChild(srcOpt);
+
+        const destOpt = document.createElement('option');
+        destOpt.value = ep.id;
+        destOpt.text  = ep.name;
+        destOpt.selected = ep.id === activeId;
+        migrateDestEl.appendChild(destOpt);
+    }
+}
+
+migrateBtnEl.addEventListener('click', async () => {
+    const sourceId = migrateSourceEl.value;
+    const destId   = migrateDestEl.value;
+
+    migrateBtnEl.disabled       = true;
+    migrateResultEl.textContent = 'Reading source…';
+    migrateResultEl.className   = '';
+
+    try {
+        const src   = await registry.getInitialized(sourceId);
+        const items = await src.list();
+
+        if (items === null) {
+            migrateResultEl.textContent = `"${src.name}" does not support listing bookmarks.`;
+            migrateResultEl.className   = 'error';
+            return;
+        }
+
+        if (items.length === 0) {
+            migrateResultEl.textContent = 'No bookmarks found in source.';
+            return;
+        }
+
+        migrateResultEl.textContent = `Migrating ${items.length} bookmark(s)…`;
+        const dest = await registry.getInitialized(destId);
+
+        for (const { title, url, note } of items) {
+            await dest.add(title, url, note);
+        }
+
+        let message = `Migrated ${items.length} bookmark(s) to ${dest.name}.`;
+
+        if (destId === 'local_markdown') {
+            const flush = await dest.flushQueue();
+            message += flush.ok
+                ? ` File updated.`
+                : ` ${flush.message}`;
+        }
+
+        migrateResultEl.textContent = message;
+        migrateResultEl.className   = 'ok';
+
+        if (destId === 'browser_storage') await refreshBrowserStorageUI();
+    } catch (e) {
+        migrateResultEl.textContent = e.message;
+        migrateResultEl.className   = 'error';
+    } finally {
+        migrateBtnEl.disabled = false;
+    }
 });
 
 // Test connection

@@ -70,6 +70,21 @@
       <button type="button" id="test-btn">Test Connection</button>
       <span id="test-result"></span>
     </section>
+
+    <section id="migrate-section">
+      <h2>Migrate Bookmarks</h2>
+      <p class="section-note">Copy all bookmarks from one endpoint into another.</p>
+      <div class="field">
+        <label for="migrate-source">From</label>
+        <select id="migrate-source"></select>
+      </div>
+      <div class="field">
+        <label for="migrate-dest">To</label>
+        <select id="migrate-dest"></select>
+      </div>
+      <button type="button" id="migrate-btn">Migrate</button>
+      <div id="migrate-result"></div>
+    </section>
   </main>
 
   <script src="options.js" type="module"></script>

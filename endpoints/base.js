@@ -21,4 +21,7 @@ export class BookmarkEndpoint {
 
     // Returns { ok: boolean, message: string }
     async test()                 { return { ok: false, message: 'not implemented' }; }
+
+    // Returns null if listing is not supported, or [{title, url, note}] if it is
+    async list()                 { return null; }
 }
