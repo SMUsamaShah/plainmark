@@ -11,13 +11,14 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
             { label: 'Create Account', url: 'https://workflowy.com/signup/' },
             { label: 'Get API Key',    url: 'https://beta.workflowy.com/api-key/' },
             { label: 'API Docs',       url: 'https://beta.workflowy.com/api-reference/' },
+            { label: 'API Reference (Markdown)', url: 'https://beta.workflowy.com/api-reference.md' },
         ];
     }
 
     get settingsSchema() {
         return [
             { key: 'token',    label: 'API Token (wfpak_...)', type: 'password', required: true,  placeholder: 'Get from beta.workflowy.com/api-key' },
-            { key: 'parentId', label: 'Parent location',       type: 'text',     required: false, placeholder: 'inbox (default), today, or a node UUID' },
+            { key: 'parentId', label: 'Parent location',       type: 'text',     required: false, placeholder: 'inbox (default), today, or pick from list below', browse: true },
         ];
     }
 
@@ -31,6 +32,16 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
             'Authorization': `Bearer ${this._token}`,
             'Content-Type':  'application/json',
         };
+    }
+
+    async getNodes(parentId = 'inbox') {
+        if (!this._token) return null;
+        const res = await fetch(`${BASE}/nodes?parent_id=${encodeURIComponent(parentId)}`, { headers: this._headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return (data.nodes || [])
+            .sort((a, b) => a.priority - b.priority)
+            .map(n => ({ id: n.id, label: (n.name || '').replace(/<[^>]+>/g, '') || n.id }));
     }
 
     async add(title, url, note) {

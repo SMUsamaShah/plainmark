@@ -19,7 +19,7 @@ export class DynalistEndpoint extends BookmarkEndpoint {
         return [
             { key: 'token',       label: 'API Token',    type: 'password', required: true,  placeholder: 'Get from dynalist.io/developer' },
             { key: 'fileId',      label: 'File ID',      type: 'text',     required: true,  placeholder: 'FILE_ID — from your Dynalist doc URL or bookmarklet' },
-            { key: 'inboxNodeId', label: 'Parent Node ID', type: 'text',   required: true,  placeholder: 'INBOX_NODE_ID — the node new bookmarks go under' },
+            { key: 'inboxNodeId', label: 'Parent Node ID', type: 'text',   required: true,  placeholder: 'Pick from list below or paste node ID', browse: true },
             { key: 'useInbox',    label: 'Use /inbox/add instead (no File ID needed, but editing is disabled)', type: 'checkbox', required: false },
         ];
     }
@@ -87,7 +87,8 @@ export class DynalistEndpoint extends BookmarkEndpoint {
         return res.files;
     }
 
-    async getNodes(fileId) {
+    async getNodes(fileId = this._fileId) {
+        if (!fileId) return null;
         const res = await postJson(`${BASE}/doc/read`, { token: this._token, file_id: fileId });
         if (res._code !== 'Ok') throw new Error(res._code);
         return res.nodes.filter(n => n.id !== 'root').map(n => ({ id: n.id, label: n.content }));

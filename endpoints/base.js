@@ -27,4 +27,7 @@ export class BookmarkEndpoint {
 
     // Returns null if listing is not supported, or [{title, url, note}] if it is
     async list()                 { return null; }
+
+    // Returns null if not supported, or [{id, label}] for the node picker
+    async getNodes()             { return null; }
 }

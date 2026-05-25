@@ -118,6 +118,60 @@ async function renderSettingsForm(endpointId) {
         } else {
             wrapper.append(lbl, input);
         }
+
+        if (field.browse) {
+            const browseRow = document.createElement('div');
+            browseRow.className = 'browse-row';
+
+            const browseBtn = document.createElement('button');
+            browseBtn.type        = 'button';
+            browseBtn.textContent = 'Browse nodes…';
+            browseBtn.className   = 'btn-secondary';
+
+            const nodeSelect = document.createElement('select');
+            nodeSelect.className    = 'node-select';
+            nodeSelect.style.display = 'none';
+
+            const useBtn = document.createElement('button');
+            useBtn.type          = 'button';
+            useBtn.textContent   = 'Use selected';
+            useBtn.className     = 'btn-secondary';
+            useBtn.style.display = 'none';
+
+            browseBtn.addEventListener('click', async () => {
+                browseBtn.disabled    = true;
+                browseBtn.textContent = 'Loading…';
+                try {
+                    const ep    = await registry.getInitialized(endpointId);
+                    const nodes = await ep.getNodes();
+                    if (!nodes?.length) {
+                        browseBtn.textContent = 'No nodes found';
+                        browseBtn.disabled    = false;
+                        return;
+                    }
+                    nodeSelect.innerHTML = nodes
+                        .map(n => `<option value="${n.id}">${n.label || n.id}</option>`)
+                        .join('');
+                    nodeSelect.style.display = 'block';
+                    useBtn.style.display     = 'inline-block';
+                    browseBtn.textContent    = 'Refresh';
+                } catch (e) {
+                    browseBtn.textContent = `Error: ${e.message}`;
+                }
+                browseBtn.disabled = false;
+            });
+
+            useBtn.addEventListener('click', async () => {
+                input.value = nodeSelect.value;
+                const current = await registry.getSettings(endpointId);
+                current[field.key] = nodeSelect.value;
+                await registry.saveSettings(endpointId, current);
+            });
+
+            browseRow.append(browseBtn, nodeSelect, useBtn);
+            wrapper.appendChild(browseRow);
+        }
+
         settingsFormEl.appendChild(wrapper);
     }
 
