@@ -53,6 +53,16 @@ h2 {
   color: #e67e22;
 }
 
+#endpoint-links {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.9;
+}
+#endpoint-links a { color: #4a90e2; text-decoration: none; }
+#endpoint-links a:hover { text-decoration: underline; }
+.ep-link-label { color: #999; }
+
 /* Settings form */
 #settings-form { display: flex; flex-direction: column; gap: 12px; }
 
@@ -108,14 +118,39 @@ button {
 }
 button:hover { background: #357abd; border-color: #357abd; }
 
-#flush-btn {
+/* Node browser */
+.browse-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.browse-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
   background: #fff;
   color: #4a90e2;
+  border-color: #4a90e2;
+  font-size: 12px;
+  padding: 5px 10px;
 }
-#flush-btn:hover { background: #f0f6ff; }
+.btn-secondary:hover { background: #f0f6ff; }
 
-#flush-result { font-size: 12px; color: #27ae60; }
-#flush-result.error { color: #c0392b; }
+.node-select {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 13px;
+  background: #fff;
+}
 
 /* Local markdown step layout */
 .step {
@@ -171,3 +206,30 @@ button:hover { background: #357abd; border-color: #357abd; }
 }
 #test-result.ok    { color: #27ae60; }
 #test-result.error { color: #c0392b; }
+
+/* Migrate section */
+#migrate-section { display: flex; flex-direction: column; gap: 12px; }
+
+.section-note {
+  font-size: 12px;
+  color: #888;
+  margin-top: -6px;
+}
+
+#migrate-section .field select {
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+  width: 100%;
+  background: #fff;
+  cursor: pointer;
+}
+#migrate-section .field select:focus { outline: none; border-color: #4a90e2; }
+
+#migrate-result {
+  font-size: 13px;
+  color: #555;
+}
+#migrate-result.ok    { color: #27ae60; }
+#migrate-result.error { color: #c0392b; }

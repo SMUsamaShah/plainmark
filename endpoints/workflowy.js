@@ -6,10 +6,21 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
     get id()   { return 'workflowy'; }
     get name() { return 'Workflowy'; }
 
+    get links() {
+        return [
+            { label: 'Create Account', url: 'https://workflowy.com/signup/' },
+            { label: 'Get API Key',    url: 'https://beta.workflowy.com/api-key/' },
+            { label: 'API Docs',       url: 'https://beta.workflowy.com/api-reference/' },
+            { label: 'API Reference (Markdown)', url: 'https://beta.workflowy.com/api-reference.md' },
+        ];
+    }
+
+    get addDelay() { return 500; } // ~120/min, well under rate limit
+
     get settingsSchema() {
         return [
             { key: 'token',    label: 'API Token (wfpak_...)', type: 'password', required: true,  placeholder: 'Get from beta.workflowy.com/api-key' },
-            { key: 'parentId', label: 'Parent location',       type: 'text',     required: false, placeholder: 'inbox (default), today, or a node UUID' },
+            { key: 'parentId', label: 'Parent location',       type: 'text',     required: false, placeholder: 'inbox (default), today, or pick from list below', browse: true },
         ];
     }
 
@@ -25,9 +36,18 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
         };
     }
 
+    async getNodes(parentId = 'None') {
+        if (!this._token) return null;
+        const res = await fetch(`${BASE}/nodes?parent_id=${encodeURIComponent(parentId)}`, { headers: this._headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return (data.nodes || [])
+            .sort((a, b) => a.priority - b.priority)
+            .map(n => ({ id: n.id, label: (n.name || '').replace(/<[^>]+>/g, '') || n.id }));
+    }
+
     async add(title, url, note) {
-        // Use markdown link syntax in the name field
-        const name = url ? `[${title}](${url})` : title;
+        const name = url ? `${title} ${url}` : title;
         const res = await fetch(`${BASE}/nodes`, {
             method:  'POST',
             headers: this._headers(),
@@ -35,7 +55,7 @@ export class WorkflowyEndpoint extends BookmarkEndpoint {
                 parent_id: this._parentId,
                 name:      name,
                 note:      note || '',
-                position:  0,
+                position:  'bottom',
             }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

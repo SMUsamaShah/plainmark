@@ -3,10 +3,12 @@ import { WorkflowyEndpoint }      from './workflowy.js';
 import { LocalMarkdownEndpoint }  from './local_markdown.js';
 import { DownloadsFileEndpoint }  from './downloads_file.js';
 import { BrowserStorageEndpoint } from './browser_storage.js';
+import { GistEndpoint }           from './gist.js';
 
 const ALL_ENDPOINTS = [
     new DynalistEndpoint(),
     new WorkflowyEndpoint(),
+    new GistEndpoint(),
     new LocalMarkdownEndpoint(),
     new DownloadsFileEndpoint(),
     new BrowserStorageEndpoint(),
@@ -48,5 +50,12 @@ export const registry = {
     async saveSettings(id, settings) {
         const key = `${id}Settings`;
         await chrome.storage.sync.set({ [key]: settings });
+    },
+
+    async getInitialized(id) {
+        const ep       = this.getById(id);
+        const settings = await this.getSettings(id);
+        await ep.init(settings);
+        return ep;
     },
 };

@@ -4,7 +4,6 @@ const IDB_NAME    = 'plainmark';
 const IDB_VERSION = 1;
 const STORE_NAME  = 'handles';
 const HANDLE_KEY  = 'localMarkdown';
-const QUEUE_KEY   = 'localMarkdownQueue';
 
 // IndexedDB helpers — work in service worker and extension page contexts
 function openIDB() {
@@ -44,94 +43,65 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
 
     async init(_settings = {}) {}
 
-    // Called from service worker: queue the entry (file I/O not available in SW)
+    // Must be called from DOM context (not service worker).
+    // Returns { id: lineStart } — the 0-indexed line number, used by update/delete
+    // within the same popup session.
     async add(title, url, note) {
-        const id    = crypto.randomUUID();
-        const entry = { id, title, url: url || '', note: note || '', timestamp: Date.now() };
+        const handle = await this._requireHandle();
 
-        const stored = await chrome.storage.local.get(QUEUE_KEY);
-        const queue  = stored[QUEUE_KEY] ?? [];
-        queue.push(entry);
-        await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+        const file      = await handle.getFile();
+        const content   = await file.text();
+        const lineStart = this._lineCount(content);
 
-        return { id };
-    }
-
-    // Check current permission without requesting — safe to call anywhere, no user gesture needed
-    async checkPermission() {
-        const handle = await idbGet(HANDLE_KEY);
-        if (!handle) return 'no-handle';
-        return handle.queryPermission({ mode: 'readwrite' });
-    }
-
-    // Request permission — MUST be called directly from a user gesture (button click)
-    async requestPermission() {
-        const handle = await idbGet(HANDLE_KEY);
-        if (!handle) return false;
-        const result = await handle.requestPermission({ mode: 'readwrite' });
-        return result === 'granted';
-    }
-
-    // Flush queued entries to file — only proceeds if permission already granted
-    // Returns { ok, message, needsPermission? }
-    async flushQueue() {
-        const handle = await idbGet(HANDLE_KEY);
-        if (!handle) {
-            return { ok: false, message: 'No file selected. Open Options to pick a Markdown file.' };
-        }
-
-        const perm = await handle.queryPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') {
-            return { ok: false, needsPermission: true, message: 'Tap "Grant file access" to write to your Markdown file.' };
-        }
-
-        const stored = await chrome.storage.local.get(QUEUE_KEY);
-        const queue  = stored[QUEUE_KEY] ?? [];
-        if (queue.length === 0) return { ok: true, message: 'Nothing to flush.', count: 0 };
-
-        const file    = await handle.getFile();
-        let content   = await file.text();
-        const newText = queue.map(e => this._formatEntry(e)).join('\n');
-        content       = content + (content.endsWith('\n') ? '' : '\n') + newText + '\n';
-
-        const writable = await handle.createWritable();
-        await writable.write(content);
-        await writable.close();
-
-        await chrome.storage.local.set({ [QUEUE_KEY]: [] });
-        return { ok: true, message: `Saved ${queue.length} bookmark(s) to file.`, count: queue.length };
-    }
-
-    // Update note in file — must be called from DOM context (not service worker)
-    // Silently skips if no file or no permission (note update is non-critical)
-    async update(id, note) {
-        const handle = await idbGet(HANDLE_KEY);
-        if (!handle) return { ok: true }; // no file configured, skip silently
-
-        const perm = await handle.queryPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') return { ok: true }; // permission lapsed, skip silently
-
-        const file    = await handle.getFile();
-        const content = await file.text();
-        const updated = this._replaceNote(content, id, note);
+        const entry   = this._formatEntry({ title, url, note });
+        const updated = (content && !content.endsWith('\n') ? content + '\n' : content) + entry + '\n';
 
         const writable = await handle.createWritable();
         await writable.write(updated);
         await writable.close();
-        return { ok: true };
+
+        return { id: lineStart };
     }
 
-    // Remove entry from file — must be called from DOM context (not service worker)
-    async delete(id) {
+    // lineStart is the value returned by add(). Silently skips if file/permission unavailable.
+    async update(lineStart, note) {
         const handle = await idbGet(HANDLE_KEY);
         if (!handle) return { ok: true };
-
         const perm = await handle.queryPermission({ mode: 'readwrite' });
         if (perm !== 'granted') return { ok: true };
 
         const file    = await handle.getFile();
         const content = await file.text();
-        const updated = this._removeEntry(content, id);
+        const lines   = content.split('\n');
+
+        if (!lines[lineStart]?.startsWith('- ')) return { ok: true };
+
+        if (lines[lineStart + 1]?.startsWith('  > ')) lines.splice(lineStart + 1, 1);
+        if (note) lines.splice(lineStart + 1, 0, `  > ${note}`);
+
+        const writable = await handle.createWritable();
+        await writable.write(lines.join('\n'));
+        await writable.close();
+        return { ok: true };
+    }
+
+    async delete(lineStart) {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) return { ok: true };
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') return { ok: true };
+
+        const file    = await handle.getFile();
+        const content = await file.text();
+        const lines   = content.split('\n');
+
+        if (!lines[lineStart]?.startsWith('- ')) return { ok: true };
+
+        const hasNote = lines[lineStart + 1]?.startsWith('  > ');
+        lines.splice(lineStart, hasNote ? 2 : 1);
+
+        let updated = lines.join('\n');
+        if (updated && !updated.endsWith('\n')) updated += '\n';
 
         const writable = await handle.createWritable();
         await writable.write(updated);
@@ -143,8 +113,6 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         await idbPut(HANDLE_KEY, fileHandle);
     }
 
-    // Exposes the raw handle for pre-loading in UI contexts so requestPermission()
-    // can be called as the first await in a click handler (user gesture requirement)
     getHandle() {
         return idbGet(HANDLE_KEY);
     }
@@ -161,29 +129,46 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         return { ok: true, message: `File: ${handle.name} (permission: ${perm})` };
     }
 
-    _formatEntry({ id, title, url, note }) {
-        let line = url
-            ? `- [${title}](${url}) <!-- bm:${id} -->`
-            : `- ${title} <!-- bm:${id} -->`;
-        if (note) line += `\n  > ${note}`;
-        return line;
+    async list() {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) return null;
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') throw new Error('File access not granted. Click "Grant file access" in Options first.');
+
+        const file    = await handle.getFile();
+        const content = await file.text();
+        const lines   = content.split('\n');
+        const results = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            if (!lines[i].startsWith('- ')) continue;
+            const raw      = lines[i].slice(2);
+            const urlMatch = raw.match(/(https?:\/\/\S+)$/);
+            const url      = urlMatch ? urlMatch[1] : '';
+            const title    = url ? raw.slice(0, -url.length).trimEnd() : raw;
+            const note     = lines[i + 1]?.startsWith('  > ') ? lines[i + 1].slice(4) : '';
+            if (title) results.push({ title, url, note });
+        }
+        return results;
     }
 
-    _replaceNote(content, id, newNote) {
-        const entryPattern = new RegExp(
-            `(- .*?<!-- bm:${id} -->)(\\n  > [^\\n]*)?`,
-            'g'
-        );
-        return content.replace(entryPattern, (_, entryLine) => {
-            return newNote ? `${entryLine}\n  > ${newNote}` : entryLine;
-        });
+    _formatEntry({ title, url, note }) {
+        const line = url ? `- ${title} ${url}` : `- ${title}`;
+        return note ? `${line}\n  > ${note}` : line;
     }
 
-    _removeEntry(content, id) {
-        const entryPattern = new RegExp(
-            `- .*?<!-- bm:${id} -->(\\n  > [^\\n]*)?\n?`,
-            'g'
-        );
-        return content.replace(entryPattern, '');
+    // Number of content lines (trailing \n doesn't add a line)
+    _lineCount(content) {
+        if (!content) return 0;
+        const n = content.split('\n').length;
+        return content.endsWith('\n') ? n - 1 : n;
+    }
+
+    async _requireHandle() {
+        const handle = await idbGet(HANDLE_KEY);
+        if (!handle) throw new Error('No file selected. Open ⚙ Options to pick a Markdown file.');
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') throw new Error(`Open ⚙ Options → Grant access to ${handle.name}`);
+        return handle;
     }
 }

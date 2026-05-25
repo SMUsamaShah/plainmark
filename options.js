@@ -2,6 +2,7 @@ import { registry } from './endpoints/registry.js';
 
 const endpointSelectEl   = document.getElementById('endpoint-select');
 const endpointWarningEl  = document.getElementById('endpoint-warning');
+const endpointLinksEl    = document.getElementById('endpoint-links');
 const settingsFormEl     = document.getElementById('settings-form');
 const settingsHeading   = document.getElementById('settings-heading');
 const filePickerArea    = document.getElementById('file-picker-area');
@@ -10,11 +11,12 @@ const pickFileBtn       = document.getElementById('pick-file-btn');
 const grantStep         = document.getElementById('grant-step');
 const permStatusEl      = document.getElementById('permission-status');
 const grantAccessBtn    = document.getElementById('grant-access-btn');
-const queueStep         = document.getElementById('queue-step');
-const queueStatusEl     = document.getElementById('queue-status');
-const flushBtn          = document.getElementById('flush-btn');
 const testBtn           = document.getElementById('test-btn');
 const testResultEl      = document.getElementById('test-result');
+const migrateSourceEl   = document.getElementById('migrate-source');
+const migrateDestEl     = document.getElementById('migrate-dest');
+const migrateBtnEl      = document.getElementById('migrate-btn');
+const migrateResultEl   = document.getElementById('migrate-result');
 const browserStorageArea = document.getElementById('browser-storage-area');
 const bsCountEl          = document.getElementById('bs-count');
 const bsCopyMdBtn        = document.getElementById('bs-copy-md-btn');
@@ -37,6 +39,7 @@ async function init() {
     const activeId = await registry.getActiveId();
     renderEndpointSelect(activeId);
     await renderSettingsForm(activeId);
+    renderMigrateSelects(activeId);
 }
 
 function renderEndpointSelect(activeId) {
@@ -67,10 +70,19 @@ async function renderSettingsForm(endpointId) {
     testResultEl.className            = '';
 
     if (ep.warning) {
-        endpointWarningEl.textContent    = ep.warning;
-        endpointWarningEl.style.display  = 'block';
+        endpointWarningEl.textContent   = ep.warning;
+        endpointWarningEl.style.display = 'block';
     } else {
-        endpointWarningEl.style.display  = 'none';
+        endpointWarningEl.style.display = 'none';
+    }
+
+    if (ep.links.length) {
+        endpointLinksEl.innerHTML = ep.links
+            .map(({ label, url }) => `<span class="ep-link-label">${label}:</span> <a href="${url}" target="_blank" rel="noopener">${url}</a>`)
+            .join('<br>');
+        endpointLinksEl.style.display = 'block';
+    } else {
+        endpointLinksEl.style.display = 'none';
     }
 
     for (const field of ep.settingsSchema) {
@@ -106,6 +118,99 @@ async function renderSettingsForm(endpointId) {
         } else {
             wrapper.append(lbl, input);
         }
+
+        if (field.browse) {
+            const browseRow = document.createElement('div');
+            browseRow.className = 'browse-row';
+
+            const browseBtn = document.createElement('button');
+            browseBtn.type        = 'button';
+            browseBtn.textContent = 'Browse nodes…';
+            browseBtn.className   = 'btn-secondary';
+
+            const navRow = document.createElement('div');
+            navRow.className    = 'browse-nav';
+            navRow.style.display = 'none';
+
+            const backBtn = document.createElement('button');
+            backBtn.type        = 'button';
+            backBtn.textContent = '← Back';
+            backBtn.className   = 'btn-secondary';
+            backBtn.style.display = 'none';
+
+            const nodeSelect = document.createElement('select');
+            nodeSelect.className = 'node-select';
+
+            const enterBtn = document.createElement('button');
+            enterBtn.type        = 'button';
+            enterBtn.textContent = 'Enter →';
+            enterBtn.className   = 'btn-secondary';
+            enterBtn.title       = 'Browse into selected node';
+
+            const useBtn = document.createElement('button');
+            useBtn.type        = 'button';
+            useBtn.textContent = 'Use';
+            useBtn.className   = 'btn-secondary';
+
+            navRow.append(backBtn, nodeSelect, enterBtn, useBtn);
+            browseRow.append(browseBtn, navRow);
+
+            // path is a stack of {id, label} for the Back button
+            const path = [];
+
+            const loadNodes = async (parentId) => {
+                browseBtn.disabled    = true;
+                browseBtn.textContent = 'Loading…';
+                try {
+                    const ep    = await registry.getInitialized(endpointId);
+                    const nodes = await ep.getNodes(parentId);
+                    if (nodes === null) {
+                        browseBtn.textContent = 'Not supported';
+                        return;
+                    }
+                    if (!nodes.length) {
+                        browseBtn.textContent = 'No child nodes';
+                        return;
+                    }
+                    nodeSelect.innerHTML = nodes
+                        .map(n => `<option value="${n.id}">${n.label || n.id}</option>`)
+                        .join('');
+                    navRow.style.display  = 'flex';
+                    backBtn.style.display = path.length ? 'inline-block' : 'none';
+                    browseBtn.textContent = 'Refresh';
+                } catch (e) {
+                    browseBtn.textContent = `Error: ${e.message}`;
+                }
+                browseBtn.disabled = false;
+            };
+
+            browseBtn.addEventListener('click', () => {
+                path.length = 0;
+                loadNodes(undefined); // endpoint default (root)
+            });
+
+            enterBtn.addEventListener('click', () => {
+                const selectedId    = nodeSelect.value;
+                const selectedLabel = nodeSelect.options[nodeSelect.selectedIndex]?.text ?? selectedId;
+                path.push({ id: selectedId, label: selectedLabel });
+                loadNodes(selectedId);
+            });
+
+            backBtn.addEventListener('click', () => {
+                path.pop();
+                loadNodes(path.length ? path[path.length - 1].id : undefined);
+            });
+
+            useBtn.addEventListener('click', async () => {
+                input.value = nodeSelect.value;
+                const current = await registry.getSettings(endpointId);
+                current[field.key] = nodeSelect.value;
+                await registry.saveSettings(endpointId, current);
+            });
+
+            wrapper.appendChild(browseRow);
+        }
+
         settingsFormEl.appendChild(wrapper);
     }
 
@@ -120,47 +225,31 @@ async function renderSettingsForm(endpointId) {
     }
 }
 
-// Refresh the entire local_markdown UI: file name, permission status, queue count
 async function refreshLocalMarkdownUI() {
     const ep = registry.getById('local_markdown');
 
-    // Pre-load handle (safe to do without user gesture)
     preloadedHandle = await ep.getHandle();
 
     if (!preloadedHandle) {
-        currentFileEl.textContent  = 'No file chosen.';
-        grantStep.style.display    = 'none';
-        queueStep.style.display    = 'none';
+        currentFileEl.textContent = 'No file chosen.';
+        grantStep.style.display   = 'none';
         return;
     }
 
-    // Step 1: show filename
     currentFileEl.textContent = `✓ ${preloadedHandle.name}`;
-
-    // Step 2: permission
-    grantStep.style.display = 'block';
+    grantStep.style.display   = 'block';
     const perm = await preloadedHandle.queryPermission({ mode: 'readwrite' });
     updatePermissionUI(perm);
-
-    // Step 3: queue
-    const stored = await chrome.storage.local.get('localMarkdownQueue');
-    const queue  = stored['localMarkdownQueue'] ?? [];
-    if (queue.length > 0) {
-        queueStep.style.display  = 'block';
-        queueStatusEl.textContent = `${queue.length} bookmark${queue.length === 1 ? '' : 's'} waiting to be written.`;
-    } else {
-        queueStep.style.display = 'none';
-    }
 }
 
 function updatePermissionUI(perm) {
     if (perm === 'granted') {
-        permStatusEl.textContent  = '✓ Access granted';
-        permStatusEl.className    = 'perm-granted';
+        permStatusEl.textContent     = '✓ Access granted';
+        permStatusEl.className       = 'perm-granted';
         grantAccessBtn.style.display = 'none';
     } else {
-        permStatusEl.textContent  = 'Access needed — click Grant after each browser restart.';
-        permStatusEl.className    = 'perm-needed';
+        permStatusEl.textContent     = 'Access needed — click Grant after each browser restart.';
+        permStatusEl.className       = 'perm-needed';
         grantAccessBtn.style.display = 'inline-block';
     }
 }
@@ -188,29 +277,6 @@ grantAccessBtn.addEventListener('click', async () => {
     if (!preloadedHandle) return;
     const perm = await preloadedHandle.requestPermission({ mode: 'readwrite' });
     updatePermissionUI(perm);
-    if (perm === 'granted') {
-        // Refresh queue step in case there are bookmarks waiting
-        await refreshLocalMarkdownUI();
-    }
-});
-
-// Flush queued bookmarks — only reachable after permission is granted
-flushBtn.addEventListener('click', async () => {
-    flushBtn.disabled         = true;
-    queueStatusEl.textContent = 'Writing…';
-    try {
-        const ep     = registry.getById('local_markdown');
-        const result = await ep.flushQueue();
-        if (result.ok) {
-            queueStep.style.display  = 'none';
-            permStatusEl.textContent = `✓ Access granted — last write: ${result.message}`;
-        } else {
-            queueStatusEl.textContent = result.message;
-        }
-    } catch (e) {
-        queueStatusEl.textContent = e.message;
-    }
-    flushBtn.disabled = false;
 });
 
 // Browser Storage UI
@@ -257,6 +323,62 @@ bsClearBtn.addEventListener('click', async () => {
     const ep = registry.getById('browser_storage');
     await ep.clear();
     await refreshBrowserStorageUI();
+});
+
+// Migrate section
+function renderMigrateSelects(activeId) {
+    for (const ep of registry.getAll()) {
+        const srcOpt  = document.createElement('option');
+        srcOpt.value  = ep.id;
+        srcOpt.text   = ep.name;
+        migrateSourceEl.appendChild(srcOpt);
+
+        const destOpt = document.createElement('option');
+        destOpt.value = ep.id;
+        destOpt.text  = ep.name;
+        destOpt.selected = ep.id === activeId;
+        migrateDestEl.appendChild(destOpt);
+    }
+}
+
+migrateBtnEl.addEventListener('click', async () => {
+    const sourceId = migrateSourceEl.value;
+    const destId   = migrateDestEl.value;
+
+    migrateBtnEl.disabled       = true;
+    migrateResultEl.textContent = 'Reading source…';
+    migrateResultEl.className   = '';
+
+    try {
+        const src   = await registry.getInitialized(sourceId);
+        const items = await src.list();
+
+        if (items === null) {
+            migrateResultEl.textContent = `"${src.name}" does not support listing bookmarks.`;
+            migrateResultEl.className   = 'error';
+            return;
+        }
+
+        if (items.length === 0) {
+            migrateResultEl.textContent = 'No bookmarks found in source.';
+            return;
+        }
+
+        migrateResultEl.textContent = `Migrating ${items.length} bookmark(s)…`;
+        const dest = await registry.getInitialized(destId);
+
+        await dest.addMany(items);
+
+        migrateResultEl.textContent = `Migrated ${items.length} bookmark(s) to ${dest.name}.`;
+        migrateResultEl.className   = 'ok';
+
+        if (destId === 'browser_storage') await refreshBrowserStorageUI();
+    } catch (e) {
+        migrateResultEl.textContent = e.message;
+        migrateResultEl.className   = 'error';
+    } finally {
+        migrateBtnEl.disabled = false;
+    }
 });
 
 // Test connection

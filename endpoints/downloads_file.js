@@ -53,6 +53,11 @@ export class DownloadsFileEndpoint extends BookmarkEndpoint {
         return { ok: true, message: `${list.length} bookmark(s). Saves to Downloads/${this._filename}` };
     }
 
+    async list() {
+        const all = await this._load();
+        return all.map(({ title, url, note }) => ({ title, url: url || '', note: note || '' }));
+    }
+
     async _load() {
         const r = await chrome.storage.local.get(STORAGE_KEY);
         return r[STORAGE_KEY] ?? [];
@@ -75,8 +80,7 @@ export class DownloadsFileEndpoint extends BookmarkEndpoint {
     }
 
     _format({ title, url, note }) {
-        let line = url ? `- [${title}](${url})` : `- ${title}`;
-        if (note) line += `\n  > ${note}`;
-        return line;
+        const line = url ? `- ${title} ${url}` : `- ${title}`;
+        return note ? `${line}\n  > ${note}` : line;
     }
 }
