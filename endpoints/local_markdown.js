@@ -170,20 +170,23 @@ export class LocalMarkdownEndpoint extends BookmarkEndpoint {
         const file    = await handle.getFile();
         const content = await file.text();
         const results = [];
-        const re = /^- (?:\[([^\]]+)\]\(([^)]+)\)|([^\n\[]+?)) <!-- bm:[a-f0-9-]+ -->(?:\n  > ([^\n]*))?/gm;
+        const re = /^- (.*?) <!-- bm:[a-f0-9-]+ -->(?:\n  > ([^\n]*))?/gm;
         let m;
         while ((m = re.exec(content)) !== null) {
-            results.push({ title: m[1] || m[3] || '', url: m[2] || '', note: m[4] || '' });
+            const raw      = m[1];
+            const urlMatch = raw.match(/(https?:\/\/\S+)$/);
+            const url      = urlMatch ? urlMatch[1] : '';
+            const title    = url ? raw.slice(0, -url.length).trimEnd() : raw;
+            results.push({ title, url, note: m[2] || '' });
         }
         return results;
     }
 
     _formatEntry({ id, title, url, note }) {
-        let line = url
-            ? `- [${title}](${url}) <!-- bm:${id} -->`
+        const line = url
+            ? `- ${title} ${url} <!-- bm:${id} -->`
             : `- ${title} <!-- bm:${id} -->`;
-        if (note) line += `\n  > ${note}`;
-        return line;
+        return note ? `${line}\n  > ${note}` : line;
     }
 
     _replaceNote(content, id, newNote) {

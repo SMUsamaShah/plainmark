@@ -80,8 +80,7 @@ export class DownloadsFileEndpoint extends BookmarkEndpoint {
     }
 
     _format({ title, url, note }) {
-        let line = url ? `- [${title}](${url})` : `- ${title}`;
-        if (note) line += `\n  > ${note}`;
-        return line;
+        const line = url ? `- ${title} ${url}` : `- ${title}`;
+        return note ? `${line}\n  > ${note}` : line;
     }
 }
